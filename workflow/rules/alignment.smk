@@ -52,7 +52,9 @@ rule bowtie2_index:
         stderr="results/logs/bowtie2_index/{reference}.err" 
     shell:
         "bowtie2-build --threads {threads} "
-        "{params.fastas} {wildcards.reference} > {log.stdout} 2> {log.stderr}"
+        "{params.fastas} "
+        "results/bowtie2_indices/{wildcards.reference}/{wildcards.reference} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule bowtie2_map:
     input:

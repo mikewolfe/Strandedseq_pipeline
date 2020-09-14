@@ -4,7 +4,6 @@ from pathlib import Path
 configfile: "config/config.yaml"
 # sample metadata and information
 pepfile: "pep/config.yaml"
-print(pep.sample_table)
 
 # include in several rules here
 include: "workflow/rules/preprocessing.smk"
@@ -45,6 +44,11 @@ def pull_processed_fastqs(samplename, config):
 
 ## overall rules
 
+rule clean:
+    threads: 1
+    shell:
+        "rm -rf results/"
+    
 rule get_region_averages:
     input:
         expand("results/deeptools_regions/regionAverage_{gff}_{norm}.npz" , gff=config["gffs"], norm=["median_log2ratio_RZ"])

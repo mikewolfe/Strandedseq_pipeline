@@ -1,0 +1,15 @@
+name: ChIPseq_pipeline
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - snakemake
+  - bowtie2
+  - trimmomatic
+  - cutadapt
+  - deeptools
+  - ncbi-acc-download
+  - peppy
+  - samtools
+prefix: /mnt/scratch/mbwolfe/miniconda3/envs/ChIPseq_pipeline
