@@ -8,6 +8,7 @@ pepfile: "pep/config.yaml"
 # include in several rules here
 include: "workflow/rules/preprocessing.smk"
 include: "workflow/rules/alignment.smk"
+include: "workflow/rules/coverage_and_norm.smk"
 
 ## HELPER FUNCTIONS
 def samples(pep):
@@ -127,33 +128,18 @@ rule fastqc_processed:
         "fastqc {input} -o results/fastqc_processed > {log.stdout} 2> {log.stderr}"
 
 
-rule deeptools_coverage_raw:
-    input:
-        inbam=lambda wildcards: "bowtie2/%s_sorted.bam"%(config["named_samples"][wildcards.sampname]),
-        ind=lambda wildcards: "bowtie2/%s_sorted.bam.bai"%(config["named_samples"][wildcards.sampname]),
-    output:
-        "deeptools_coverage/{sampname}_raw.bw"
-    log:
-        stdout="logs/deeptools/{sampname}_genome_coverage_raw.log",
-        stderr="logs/deeptools/{sampname}_genome_coverage_raw.err"
-    threads:
-        5
-    shell:
-        "bamCoverage --bam {input.inbam} --outFileName {output} --outFileFormat 'bigwig' "
-        "--numberOfProcessors {threads} --binSize 5 --samFlagInclude 66 --extendReads "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
-rule custom_bw2npy:
+rule bwtools_bw2npy:
     input:
-        "deeptools_coverage/{sampname}_{norm}.bw"
+        "results/deeptools_coverage/{sampname}_{norm}.bw"
     output:
-        "deeptools_coverage/{sampname}_{norm}.npy"
+        "results/deeptools_coverage/{sampname}_{norm}.npy"
     log:
-        stdout="logs/custom/{sampname}_{norm}_bw2npy.log",
-        stderr="logs/custom/{sampname}_{norm}_bw2npy.err"
+        stdout="results/logs/bwtools/{sampname}_{norm}_bw2npy.log",
+        stderr="results/logs/bwtools/{sampname}_{norm}_bw2npy.err"
     shell:
        "python3 "
-       "/mnt/Groups/LandickGrp/General/BobFile/USER_FILES/mbwolfe/tools/pytools3/bwtools.py "
+       "workflow/scripts/bwtools.py "
        "{input} {output} --fr bigwig --to numpy --chrm_name "
        "'U00096.3' --chrm_length 4641652 --res 5 > {log.stdout} 2> {log.stderr}"
 
@@ -176,75 +162,6 @@ rule cmarrt_call_peaks:
         " {input} {params.wi} {params.chrom_name} -o {params.outpre} --resolution 5 --np_start 0 "
         "--np_end 4641652 --input_numpy --consolidate {params.cons} --plots > {log.stdout} 2> {log.stderr}"
 
-rule custom_median_norm:
-    input:
-        "deeptools_coverage/{sampname}_raw.bw"
-    output:
-        "deeptools_coverage/{sampname}_median.bw"
-    log:
-        stdout="logs/custom/{sampname}_genome_coverage_median.log",
-        stderr="logs/custom/{sampname}_genome_coverage_median.err"
-    shell:
-       "python3 "
-       "/mnt/Groups/LandickGrp/General/BobFile/USER_FILES/mbwolfe/tools/pytools3/bwtools.py "
-       "{input} {output} --fr bigwig --to bigwig --chrm_name "
-       "'U00096.3' --chrm_length 4641652 --res 5 --operation Median_norm > {log.stdout} 2> {log.stderr}"
-
-rule custom_RobustZ:
-    input:
-        "deeptools_coverage/{sampname}_{norm}.bw"
-    output:
-        "deeptools_coverage/{sampname}_{norm}_RZ.bw"
-    log:
-        stdout="logs/custom/{sampname}_genome_coverage_{norm}_RZ.log",
-        stderr="logs/custom/{sampname}_genome_coverage_{norm}_RZ.err"
-    wildcard_constraints:
-        norm="(RPKM|CPM|BPM|RPGC|count|SES|median)_log2ratio"
-    shell:
-       "python3 "
-       "/mnt/Groups/LandickGrp/General/BobFile/USER_FILES/mbwolfe/tools/pytools3/bwtools.py "
-       "{input} {output} --fr bigwig --to bigwig --chrm_name "
-       "'U00096.3' --chrm_length 4641652 --res 5 --operation RobustZ > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_coverage:
-    input:
-        inbam=lambda wildcards: "bowtie2/%s_sorted.bam"%(config["named_samples"][wildcards.sampname]),
-        ind=lambda wildcards: "bowtie2/%s_sorted.bam.bai"%(config["named_samples"][wildcards.sampname]),
-    output:
-        "deeptools_coverage/{sampname}_{norm}.bw"
-    log:
-        stdout="logs/deeptools/{sampname}_genome_coverage_{norm}.log",
-        stderr="logs/deeptools/{sampname}_genome_coverage_{norm}.err"
-    params:
-        norm="{norm}"
-    wildcard_constraints:
-        norm="RPKM|CPM|BPM|RPGC"
-    threads:
-        5
-    shell:
-        "bamCoverage --bam {input.inbam} --outFileName {output} --outFileFormat 'bigwig' "
-        "--numberOfProcessors {threads} --binSize 5 --samFlagInclude 66 --extendReads "
-        "--normalizeUsing {params.norm} --effectiveGenomeSize 4641652 "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_logratio:
-    input:
-        ext= lambda wildcards: "deeptools_coverage/%s_%s.bw"%(wildcards.sampname, wildcards.norm),
-        inp= lambda wildcards: "deeptools_coverage/%s_%s.bw"%(config["input_matching"][wildcards.sampname], wildcards.norm),
-    output:
-        "deeptools_coverage/{sampname}_{norm}_log2ratio.bw"
-    wildcard_constraints:
-        norm="RPKM|CPM|BPM|RPGC|median"
-    log:
-        stdout="logs/deeptools/{sampname}_{norm}_log2ratio.log",
-        stderr="logs/deeptools/{sampname}_{norm}_log2ratio.err"
-    threads:
-        5
-    shell:
-        "bigwigCompare -b1 {input.ext} -b2 {input.inp} --outFileName {output} "
-        "--operation 'log2' "
-        "--binSize 5 "
-        "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr}"
 
 rule deeptools_regionAverage:
     input:
@@ -271,26 +188,6 @@ rule deeptools_regionAverage:
         "--labels {params.names} "
         "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr}"
 
-rule deeptools_SES_logratio:
-    input:
-        ext= lambda wildcards: "bowtie2/%s_sorted.bam"%(config["named_ext"][wildcards.sampname]),
-        inp= lambda wildcards: "bowtie2/%s_sorted.bam"%(config["named_inp"][config["input_matching"][wildcards.sampname]]),
-        ind_ext= lambda wildcards: "bowtie2/%s_sorted.bam"%(config["named_ext"][wildcards.sampname]),
-        ind_inp= lambda wildcards: "bowtie2/%s_sorted.bam.bai"%(config["named_inp"][config["input_matching"][wildcards.sampname]])
-
-    output:
-        "deeptools_coverage/{sampname}_SES_log2ratio.bw"
-    log:
-        stdout="logs/deeptools/{sampname}_SES_log2ratio.log",
-        stderr="logs/deeptools/{sampname}_SES_log2ratio.err"
-    threads:
-        5
-    shell:
-        "bamCompare --bamfile1 {input.ext} --bamfile2 {input.inp} --outFileName {output} "
-        "--outFileFormat 'bigwig' --scaleFactorsMethod 'SES' --operation 'log2' "
-        "--extendReads --binSize 5 --samFlagInclude 66 "
-        "--numberOfProcessors {threads} "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
 rule deeptools_count_logratio:
     input:
@@ -623,14 +520,4 @@ rule deeptools_plotProfile_scale:
         "--outFileNameData {output.outmat} --startLabel 'start' "
         "--endLabel 'end' "
         "--perGroup --regionsLabel {params.label} > {log.stdout} 2> {log.stderr}"
-
-rule bedgraph_coverage:
-    input:
-        "bowtie2/{sample}_sorted.bam"
-    output:
-        "raw_coverage/{sample}.bedgraph.gz"
-    log:
-        stderr="logs/bedtools/{sample}_genome_coverage.log"
-    shell:
-        "genomeCoverageBed -ibam {input} -bga -pc -g /mnt/scratch/mbwolfe/genomes/U00096_3.fasta 2> {log.stderr}| gzip > {output}"
 
