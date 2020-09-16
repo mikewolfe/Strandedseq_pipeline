@@ -1,17 +1,9 @@
-from pathlib import Path
-
 # control of the pipeline
 configfile: "config/config.yaml"
 # sample metadata and information
 pepfile: "pep/config.yaml"
 
-# include in several rules here
-include: "workflow/rules/preprocessing.smk"
-include: "workflow/rules/alignment.smk"
-include: "workflow/rules/coverage_and_norm.smk"
-include: "workflow/rules/quality_control.smk"
-
-## HELPER FUNCTIONS
+## GLOBAL HELPER FUNCTIONS
 def samples(pep):
     """
     Get all of the unique sample names
@@ -23,6 +15,19 @@ def lookup_sample_metadata(sample, key, pep):
     Get sample metadata by key
     """
     return pep.sample_table.at[sample, key]
+
+def determine_extracted_samples(pep):
+    samp_table = pep.sample_table
+    samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
+    return samples.tolist()
+    
+
+# include in several rules here
+include: "workflow/rules/preprocessing.smk"
+include: "workflow/rules/alignment.smk"
+include: "workflow/rules/coverage_and_norm.smk"
+include: "workflow/rules/quality_control.smk"
+
 
 
 ## overall rules

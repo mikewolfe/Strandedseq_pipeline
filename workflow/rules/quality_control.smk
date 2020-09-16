@@ -1,15 +1,7 @@
-## HELPER FUNCTIONS
-def samples(pep):
-    """
-    Get all of the unique sample names
-    """
-    return pep.sample_table["sample_name"]
+## HELPER FUNCTIONS inherited from parent SnakeFile:
+# samples(pep)
+# lookup_sample_metadata(sample, key, pep)
 
-def lookup_sample_metadata(sample, key, pep):
-    """
-    Get sample metadata by key
-    """
-    return pep.sample_table.at[sample, key]
 
 # General read QC
 rule read_qc:
@@ -28,7 +20,7 @@ def match_fastq_to_sample(sample, pair, pep):
     return out
 
 rule fastqc_raw:
-    message: "Running fastqc on {wildcards.basename}"
+    message: "Running fastqc on {wildcards.sample}"
     input:
        lambda wildcards: match_fastq_to_sample(wildcards.sample, wildcards.pair, pep) 
     output:

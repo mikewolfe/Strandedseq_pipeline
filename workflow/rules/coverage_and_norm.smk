@@ -1,8 +1,9 @@
-def lookup_sample_metadata(sample, key, pep):
-    """
-    Get sample metadata by key
-    """
-    return pep.sample_table.at[sample, key]
+## HELPER FUNCTIONS inherited from parent SnakeFile:
+# samples(pep)
+# lookup_sample_metadata(sample, key, pep)
+## TODO
+# allow bwtools to deal with genomes with more than one chromosome or contig
+
 
 def determine_resolution(config):
     try:
@@ -20,6 +21,55 @@ def determine_resolution(config):
         resolution = 5
         
     return resolution
+
+def determine_within_normalization(config):
+    try:
+        within = config["normalization"]["within"]
+    except KeyError:
+        print(
+        """
+        Could not find specification for normalization within a sample in config file. I.e.
+
+        normalization:
+            within: X
+
+        defaulting to normalization by median signal in bins
+        """)
+        within = "median"
+        
+    return within
+
+# SET CONSTANTS FOR COVERAGE CALCULATIONS
+RES = determine_resolution(config)
+WITHIN = determine_within_normalization(config)
+
+def determine_files_for_log2ratio(config, pep, within):
+    ending = "log2ratio"
+    if "RobustZ" in config["normalization"]:
+        RZ = config["normalization"]["RobustZ"]
+        if RZ:
+            ending += "RZ"
+    samples = determine_extracted_samples(pep) 
+    outfiles = ["results/deeptools_log2ratio/%s_%s_%s.bw"%(sample, within, ending) for sample in samples]
+    return outfiles
+
+
+# OVERALL RULES
+
+rule clean_coverage_and_norm:
+    shell:
+        "rm -fr results/deeptools_coverage/ & "
+        "rm -fr results/deeptools_log2ratio/ & "
+        "rm -fr results/logs/deeptools_coverage/ & "
+        "rm -fr results/logs/deeptools_log2ratio"
+
+rule get_raw_coverage:
+    input:
+        expand("results/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
+
+rule get_log2ratio_coverage:
+    input:
+        determine_files_for_log2ratio(config, pep, WITHIN)
 
 def determine_genome_size(sample, config, pep):
     genome = lookup_sample_metadata(sample, "genome", pep) 
@@ -47,7 +97,7 @@ rule deeptools_coverage_raw:
         stdout="results/logs/deeptools_coverage/{sample}_raw.log",
         stderr="results/logs/deeptools_coverage/{sample}_raw.err"
     params:
-        resolution = determine_resolution(config)
+        resolution = RES
     threads:
         5
     shell:
@@ -68,7 +118,7 @@ rule deeptools_coverage:
         stdout="results/logs/deeptools_coverage/{sample}_{norm}.log",
         stderr="results/logs/deeptools_coverage/{sample}_{norm}.err"
     params:
-        resolution = determine_resolution(config),
+        resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC"
@@ -97,7 +147,7 @@ rule deeptools_log2ratio:
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|median"
     params: 
-        resolution = determine_resolution(config)
+        resolution = RES
     log:
         stdout="results/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.log",
         stderr="results/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.err"
@@ -133,7 +183,7 @@ rule deeptools_SES_log2ratio:
     threads:
         5
     params: 
-        resolution = determine_resolution(config),
+        resolution = RES,
     shell:
         "bamCompare --bamfile1 {input.ext} --bamfile2 {input.inp} --outFileName {output} "
         "--outFileFormat 'bigwig' --scaleFactorsMethod 'SES' --operation 'log2' "
@@ -148,7 +198,7 @@ rule bwtools_median:
     output:
         "results/deeptools_coverage/{sample}_median.bw"
     params:
-        resolution = determine_resolution(config),
+        resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
         chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     log:
@@ -173,7 +223,7 @@ rule bwtools_RobustZ:
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median"
     params:
-        resolution = determine_resolution(config),
+        resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
         chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     shell:

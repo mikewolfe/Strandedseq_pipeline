@@ -1,8 +1,6 @@
-def lookup_sample_metadata(sample, key, pep):
-    """
-    Get sample metadata by key
-    """
-    return pep.sample_table.at[sample, key]
+## HELPER FUNCTIONS inherited from parent SnakeFile:
+# samples(pep)
+# lookup_sample_metadata(sample, key, pep)
 
 def get_fnas_for_bt2_index(config, reference):
     return config["reference"][reference]["fastas"]

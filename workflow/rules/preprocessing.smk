@@ -1,8 +1,6 @@
-def lookup_sample_metadata(sample, key, pep):
-    """
-    Get sample metadata by key
-    """
-    return pep.sample_table.at[sample, key]
+## HELPER FUNCTIONS inherited from parent SnakeFile:
+# samples(pep)
+# lookup_sample_metadata(sample, key, pep)
 
 def get_raw_fastas_per_sample(sample, pep):
     in1 = lookup_sample_metadata(sample, "file_path", pep) + \
