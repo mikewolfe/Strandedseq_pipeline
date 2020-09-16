@@ -1,3 +1,9 @@
+def lookup_sample_metadata(sample, key, pep):
+    """
+    Get sample metadata by key
+    """
+    return pep.sample_table.at[sample, key]
+
 def get_fnas_for_bt2_index(config, reference):
     return config["reference"][reference]["fastas"]
 

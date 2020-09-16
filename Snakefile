@@ -9,6 +9,7 @@ pepfile: "pep/config.yaml"
 include: "workflow/rules/preprocessing.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/coverage_and_norm.smk"
+include: "workflow/rules/quality_control.smk"
 
 ## HELPER FUNCTIONS
 def samples(pep):
@@ -23,25 +24,6 @@ def lookup_sample_metadata(sample, key, pep):
     """
     return pep.sample_table.at[sample, key]
 
-def all_raw_fastqs(pep):
-    """
-    Get all of the raw fastq files
-    """
-    these_samples = samples(pep)
-    read1s = [lookup_sample_metadata(sample, "file_path", pep) + 
-    lookup_sample_metadata(sample, "filenameR1", pep) for sample in these_samples]
-    read2s = [lookup_sample_metadata(sample, "file_path", pep) + 
-    lookup_sample_metadata(sample, "filenameR2", pep) for sample in these_samples]
-    read1s.extend(read2s)
-    return read1s
-
-def pull_processed_fastqs(samplename, config):
-    """
-    Figure out processed fastqname(s) from samplename
-    """
-    read1 = "results/trimmomatic/%s_trim_paired_R1.fastq.gz"%(samplename)
-    read2 = "results/trimmomatic/%s_trim_paired_R2.fastq.gz"%(samplename)
-    return([read1, read2])
 
 ## overall rules
 
@@ -68,16 +50,6 @@ rule summary_plots:
         #expand("deeptools_summary/plotProfile_ref_{gff}_{norm}.png", gff=config["gffs"], norm=["SES_log2ratio", "BPM_log2ratio", "RPGC_log2ratio", "median_log2ratio", "count_log2ratio", "median_log2ratio"]),
         #expand("deeptools_summary/plotProfile_scale_{gff}_{norm}.png", gff=config["gffs"], norm=["SES_log2ratio", "BPM_log2ratio", "RPGC_log2ratio", "median_log2ratio", "count_log2ratio", "median_log2ratio"])
 
-rule chIP_QC:
-    input:
-        expand("results/deeptools_QC/{inpname}_fingerprint.png", inpname=config["named_inp"]),
-        #expand("deeptools_QC/{samps}_GCBias_freqs.txt", samps=config["samples"]),
-        "results/deeptools_QC/all_corHeatmap.png",
-        "results/deeptools_QC/all_corScatterplot.png",
-        "results/deeptools_QC/all_bamPEFragmentSize.png",
-        "results/deeptools_QC/all_plotCoverage_rmdups.png",
-        "results/deeptools_QC/all_plotCoverage.png",
-        "results/deeptools_QC/all_plotPCA.png"
 
 rule get_logratios:
     input:
@@ -90,42 +62,6 @@ rule get_raw_bedgraph:
         expand("results/raw_coverage/{sample}.bedgraph.gz", sample=config["samples"]),
         expand("results/deeptools_coverage/{sample}_raw.bedgraph", sample=config["samples"]),
         expand("results/deeptools_coverage/{sample}_RPGC.bedgraph", sample=config["samples"])
-
-rule qc:
-    input:
-        expand("fastqc_raw/{sample}_{pair}_fastqc.html", sample=config["samples"], pair=["R1", "R2"]),
-        expand("fastqc_processed/{sample}_trim_paired_{pair}_fastqc.html", sample=config["samples"], pair=["R1", "R2"])
-
-
-rule fastqc_raw:
-    message: "Running fastqc on {wildcards.basename}"
-    input:
-       lambda wildcards: match_fastq_to_basename(wildcards.basename) 
-    output:
-        "results/fastqc_raw/{basename}_fastqc.html"
-    threads: 1
-    resources:
-        mem_mb=5000
-    log:
-        stdout="results/logs/fastqc_raw/{basename}_raw.log",
-        stderr="results/logs/fastqc_raw/{basename}_raw.err"
-    shell:
-        "fastqc {input} -o results/fastqc_raw > {log.stdout} 2> {log.stderr}"
-
-rule fastqc_processed:
-    message: "Running fastqc on {wildcards.sample} {wildcards.pair}"
-    input:
-        "results/trimmomatic/{sample}_trim_paired_{pair}.fastq.gz"
-    output:
-        "results/fastqc_processed/{sample}_trim_paired_{pair}_fastqc.html"
-    threads: 1
-    resources:
-        mem_mb=5000
-    log:
-        stdout="results/logs/fastqc_processed/{sample}_trim_paired_{pair}.log",
-        stderr="results/logs/fastqc_processed/{sample}_trim_paired_{pair}.err"
-    shell:
-        "fastqc {input} -o results/fastqc_processed > {log.stdout} 2> {log.stderr}"
 
 
 
@@ -210,207 +146,6 @@ rule deeptools_count_logratio:
         "--numberOfProcessors {threads} "
         "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
-def get_input_for_fingerprint(wildcards):
-    all_files = []
-    for val in config["extracted_matching"][wildcards.inpname]:
-        all_files.append("bowtie2/%s_sorted.bam"%config["named_ext"][val])
-        all_files.append("bowtie2/%s_sorted.bam.bai"%config["named_ext"][val])
-    all_files.append("bowtie2/%s_sorted.bam"%config["named_inp"][wildcards.inpname])
-    all_files.append("bowtie2/%s_sorted.bam.bai"%config["named_inp"][wildcards.inpname])
-    return all_files
-
-rule deeptools_QC_fingerprint:
-    input: get_input_for_fingerprint
-    output:
-        outplot="deeptools_QC/{inpname}_fingerprint.png",
-        rawcounts="deeptools_QC/{inpname}_fingerprint_counts.txt",
-        qualmetrics="deeptools_QC/{inpname}_fingerprint_qual_metrics.txt"
-    params:
-        contname=lambda wildcards: wildcards.inpname,
-        contbams=lambda wildcards: "bowtie2/%s_sorted.bam"%config["named_inp"][wildcards.inpname],
-        extname=lambda wildcards: " ".join([val for val in config["extracted_matching"][wildcards.inpname]]),
-        extbams=lambda wildcards: " ".join(["bowtie2/%s_sorted.bam"%config["named_ext"][val] for val in config["extracted_matching"][wildcards.inpname]])
-
-    threads:
-        10
-    log:
-        stdout="logs/deeptools/{inpname}_fingerprint.log",
-        stderr="logs/deeptools/{inpname}_fingerprint.err"
-
-    shell:
-        "plotFingerprint -b {params.contbams} {params.extbams} --plotFile {output.outplot} "
-        "--outRawCounts {output.rawcounts} --outQualityMetrics {output.qualmetrics} "
-        "--JSDsample {params.contbams} --labels {params.contname} {params.extname} "
-        "--numberOfSamples 9200 --numberOfProcessors {threads} --extendReads "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_multiBamSummary:
-    input: expand("bowtie2/{sample}_sorted.bam", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-    output:
-        "deeptools_QC/all_coverage_matrix.npz"
-    params:
-        extbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_ext"][val] for val in config["named_ext"]]),
-        inpbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_inp"][val] for val in config["named_inp"]]),
-        extname= " ".join([val for val in config["named_ext"]]),
-        inpname= " ".join([val for val in config["named_inp"]])
-    threads:
-        10
-    log:
-        stdout="logs/deeptools/all_multiBAMSummary.log",
-        stderr="logs/deeptools/all_multiBAMSummary.err"
-
-    shell:
-        "multiBamSummary bins -b {params.inpbams} {params.extbams} -o {output} "
-        "--labels {params.inpname} {params.extname} "
-        "--binSize 1000 "
-        "--numberOfProcessors {threads} --extendReads "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_corHeatmap:
-    input:
-        "deeptools_QC/all_coverage_matrix.npz"
-    output:
-        plot="deeptools_QC/all_corHeatmap.png",
-        cormat="deeptools_QC/all_corvalues.txt"
-    log:
-        stdout="logs/deeptools/all_corHeatmap.log",
-        stderr="logs/deeptools/all_corHeatmap.err"
-    shell:
-        "plotCorrelation --corData {input} --corMethod 'spearman' "
-        "--whatToPlot 'heatmap' --plotFile {output.plot} "
-        "--colorMap 'viridis' "
-        "--outFileCorMatrix {output.cormat} > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_plotPCA:
-    input:
-        "deeptools_QC/all_coverage_matrix.npz"
-    output:
-        plot="deeptools_QC/all_plotPCA.png",
-        pcaout="deeptools_QC/all_PCA_data.txt"
-    log:
-        stdout="logs/deeptools/all_plotPCA.log",
-        stderr="logs/deeptools/all_plotPCA.err"
-    shell:
-        "plotPCA --corData {input} "
-        "--plotFile {output.plot} "
-        "--outFileNameData {output.pcaout} > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_corScatterplot:
-    input:
-        "deeptools_QC/all_coverage_matrix.npz"
-    output:
-        plot="deeptools_QC/all_corScatterplot.png"
-    log:
-        stdout="logs/deeptools/all_corScatterplot.log",
-        stderr="logs/deeptools/all_corScatterplot.err"
-    shell:
-        "plotCorrelation --corData {input} --corMethod 'spearman' "
-        "--whatToPlot 'scatterplot' --plotFile {output.plot} "
-        "> {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_plotCoverage:
-    input: expand("bowtie2/{sample}_sorted.bam", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-    output:
-        plot="deeptools_QC/all_plotCoverage.png",
-        counts="deeptools_QC/all_plotCoverage_count.txt"
-    params:
-        extbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_ext"][val] for val in config["named_ext"]]),
-        inpbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_inp"][val] for val in config["named_inp"]]),
-        extname= " ".join([val for val in config["named_ext"]]),
-        inpname= " ".join([val for val in config["named_inp"]])
-    threads:
-        10
-    log:
-        stdout="logs/deeptools/all_plotCoverage.log",
-        stderr="logs/deeptools/all_plotCoverage.err"
-
-    shell:
-        "plotCoverage -b {params.inpbams} {params.extbams} -o {output.plot} "
-        "--labels {params.inpname} {params.extname} "
-        "--numberOfProcessors {threads} --extendReads "
-        "--numberOfSamples 1000 "
-        "--outRawCounts {output.counts} "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_plotCoverage_rmdups:
-    input: expand("bowtie2/{sample}_sorted.bam", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-    output:
-        plot="deeptools_QC/all_plotCoverage_rmdups.png",
-        counts="deeptools_QC/all_plotCoverage_count_rmdups.txt"
-    params:
-        extbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_ext"][val] for val in config["named_ext"]]),
-        inpbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_inp"][val] for val in config["named_inp"]]),
-        extname= " ".join([val for val in config["named_ext"]]),
-        inpname= " ".join([val for val in config["named_inp"]])
-    threads:
-        10
-    log:
-        stdout="logs/deeptools/all_plotCoverage_rmdups.log",
-        stderr="logs/deeptools/all_plotCoverage_rmdups.err"
-    shell:
-        "plotCoverage -b {params.inpbams} {params.extbams} --plotFile {output.plot} "
-        "--labels {params.inpname} {params.extname} "
-        "--numberOfProcessors {threads} --extendReads --ignoreDuplicates "
-        "--numberOfSamples 1000 "
-        "--outRawCounts {output.counts} "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_bamPEFragmentSize:
-    input: expand("bowtie2/{sample}_sorted.bam", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_ext"][val] for val in config["named_ext"]]),
-           expand("bowtie2/{sample}_sorted.bam", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-           expand("bowtie2/{sample}_sorted.bam.bai", sample=[config["named_inp"][val] for val in config["named_inp"]]),
-    output:
-        plot="deeptools_QC/all_bamPEFragmentSize.png",
-        fragment_hist="deeptools_QC/all_bamPEFragmentSize.txt",
-        table="deeptools_QC/all_bamPEFragmentSize_table.txt"
-    params:
-        extbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_ext"][val] for val in config["named_ext"]]),
-        inpbams = " ".join(["bowtie2/%s_sorted.bam"%config["named_inp"][val] for val in config["named_inp"]]),
-        extname= " ".join([val for val in config["named_ext"]]),
-        inpname= " ".join([val for val in config["named_inp"]])
-    threads:
-        10
-    log:
-        stdout="logs/deeptools/all_bamPEFragmentSize.log",
-        stderr="logs/deeptools/all_bamPEFragmentSize.err"
-    shell:
-        "bamPEFragmentSize -b {params.inpbams} {params.extbams} --histogram {output.plot} "
-        "--samplesLabel {params.inpname} {params.extname} "
-        "--numberOfProcessors {threads} "
-        "--distanceBetweenBins 10000 "
-        "--table {output.table} --outRawFragmentLengths {output.fragment_hist}  > {log.stdout} 2> {log.stderr}"
-
-rule deeptools_QC_computeGCBias:
-    input: 
-        "bowtie2/{sample}_sorted.bam"
-    output:
-        gcfile="deeptools_QC/{sample}_GCBias_freqs.txt"
-        #gcplot="deeptools_QC/{sample}_GCBias_plot.png"
-    threads:
-        5
-    log:
-        stdout="logs/deeptools/{sample}_GCBias.log",
-        stderr="logs/deeptools/{sample}_GCBias.err"
-    shell:
-        "computeGCBias -b {input} --effectiveGenomeSize 4641652 "
-        "-g /mnt/scratch/mbwolfe/genomes/U00096_3.2bit "
-        "--sampleSize 50000 "
-        "--numberOfProcessors {threads} "
-        "--GCbiasFrequenciesFile {output.gcfile}  > {log.stdout} 2> {log.stderr}"
 
 rule deeptools_ComputeMatrix_ref:
     input:

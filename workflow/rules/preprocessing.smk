@@ -1,3 +1,9 @@
+def lookup_sample_metadata(sample, key, pep):
+    """
+    Get sample metadata by key
+    """
+    return pep.sample_table.at[sample, key]
+
 def get_raw_fastas_per_sample(sample, pep):
     in1 = lookup_sample_metadata(sample, "file_path", pep) + \
             lookup_sample_metadata(sample, 'filenameR1', pep)

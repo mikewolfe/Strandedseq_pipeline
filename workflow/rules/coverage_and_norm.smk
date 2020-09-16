@@ -1,3 +1,9 @@
+def lookup_sample_metadata(sample, key, pep):
+    """
+    Get sample metadata by key
+    """
+    return pep.sample_table.at[sample, key]
+
 def determine_resolution(config):
     try:
         resolution = config["coverage"]["resolution"]
@@ -49,6 +55,7 @@ rule deeptools_coverage_raw:
         "--outFileFormat 'bigwig' "
         "--numberOfProcessors {threads} --binSize {params.resolution} "
         "--samFlagInclude 66 --extendReads "
+        "--exactScaling "
         "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
 rule deeptools_coverage:
@@ -73,6 +80,7 @@ rule deeptools_coverage:
         "--samFlagInclude 66 --extendReads "
         "--normalizeUsing {wildcards.norm} "
         "--effectiveGenomeSize {params.genome_size} "
+        "--exactScaling "
         "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
 # helper for finding correct input sample
@@ -131,6 +139,7 @@ rule deeptools_SES_log2ratio:
         "--outFileFormat 'bigwig' --scaleFactorsMethod 'SES' --operation 'log2' "
         "--extendReads --binSize {params.resolution} --samFlagInclude 66 "
         "--numberOfProcessors {threads} "
+        "--exactScaling "
         "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
 rule bwtools_median:
