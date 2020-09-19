@@ -56,20 +56,6 @@ rule summary_plots:
         #expand("deeptools_summary/plotProfile_scale_{gff}_{norm}.png", gff=config["gffs"], norm=["SES_log2ratio", "BPM_log2ratio", "RPGC_log2ratio", "median_log2ratio", "count_log2ratio", "median_log2ratio"])
 
 
-rule get_logratios:
-    input:
-#        expand("deeptools_coverage/{sampname}_SES_log2ratio.bw", sampname=config["named_ext"]),
-#        expand("deeptools_coverage/{sampname}_count_log2ratio.bw", sampname=config["named_ext"])
-        expand("results/deeptools_coverage/{sampname}_median_log2ratio_RZ.bw", sampname=config["named_ext"])
-
-rule get_raw_bedgraph:
-    input:
-        expand("results/raw_coverage/{sample}.bedgraph.gz", sample=config["samples"]),
-        expand("results/deeptools_coverage/{sample}_raw.bedgraph", sample=config["samples"]),
-        expand("results/deeptools_coverage/{sample}_RPGC.bedgraph", sample=config["samples"])
-
-
-
 rule bwtools_bw2npy:
     input:
         "results/deeptools_coverage/{sampname}_{norm}.bw"
