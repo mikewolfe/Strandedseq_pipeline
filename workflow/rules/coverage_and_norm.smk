@@ -87,8 +87,8 @@ def determine_genome_size(sample, config, pep):
 
 rule deeptools_coverage_raw:
     input:
-        inbam="results/bowtie2/{sample}_sorted.bam",
-        ind="results/bowtie2/{sample}_sorted.bam.bai"
+        inbam="results/alignment/bowtie2/{sample}_sorted.bam",
+        ind="results/alignment/bowtie2/{sample}_sorted.bam.bai"
     output:
         "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw"
     log:

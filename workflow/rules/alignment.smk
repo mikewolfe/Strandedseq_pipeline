@@ -27,8 +27,8 @@ rule pull_genbank:
     output:
         "resources/genbanks/{accession}.gbk"
     log:
-        stdout="results/logs/pull_genbank/{accession}.log",
-        stderr="results/logs/pull_genbank/{accession}.err"
+        stdout="results/alignment/logs/pull_genbank/{accession}.log",
+        stderr="results/alignment/logs/pull_genbank/{accession}.err"
     threads: 1
     conda:
         "../envs/alignment.yaml"
