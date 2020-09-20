@@ -2,16 +2,24 @@
 # samples(pep)
 # lookup_sample_metadata(sample, key, pep)
 
+rule clean_alignment:
+    shell:
+        "rm -fr results/alignment/"
+
+rule run_alignment:
+    input:
+        expand("results/alignment/bowtie2/{sample}_sorted.bam.bai", sample = samples(pep))
+
 def get_fnas_for_bt2_index(config, reference):
     return config["reference"][reference]["fastas"]
 
 def get_bt2_index(sample, pep):
     reference = lookup_sample_metadata(sample, "genome", pep)
-    return "results/bowtie2_indices/%s/%s"%(reference,reference)
+    return "results/alignment/bowtie2_index/%s/%s"%(reference,reference)
 
 def get_bt2_index_file(sample, pep):
     reference = lookup_sample_metadata(sample, "genome", pep)
-    return "results/bowtie2_indices/%s/%s.1.bt2"%(reference,reference)
+    return "results/alignment/bowtie2_index/%s/%s.1.bt2"%(reference,reference)
     
 
 rule pull_genbank:
@@ -22,6 +30,8 @@ rule pull_genbank:
         stdout="results/logs/pull_genbank/{accession}.log",
         stderr="results/logs/pull_genbank/{accession}.err"
     threads: 1
+    conda:
+        "../envs/alignment.yaml"
     shell:
         "ncbi-acc-download {wildcards.accession} --out {output} > {log.stdout} "
         "2> {log.stderr}"
@@ -31,11 +41,13 @@ rule process_genbank:
     input:
         "resources/genbanks/{genome}.gbk"
     output:
-        "results/process_genbank/{genome}/{genome}.{outfmt}"
+        "results/alignment/process_genbank/{genome}/{genome}.{outfmt}"
     log:
-        stdout="results/logs/process_genbank/{genome}_{outfmt}.log",
-        stderr="results/logs/process_genbank/{genome}_{outfmt}.err"
+        stdout="results/alignment/logs/process_genbank/{genome}_{outfmt}.log",
+        stderr="results/alignment/logs/process_genbank/{genome}_{outfmt}.err"
     threads: 1
+    conda:
+        "../envs/alignment.yaml"
     shell:
          "python3 workflow/scripts/parse_genbank.py {input} "
          "--outfmt {wildcards.outfmt} "
@@ -46,33 +58,37 @@ rule bowtie2_index:
     input:
         lambda wildcards: get_fnas_for_bt2_index(config, wildcards.reference)
     output:
-        "results/bowtie2_indices/{reference}/{reference}.1.bt2"
+        "results/alignment/bowtie2_index/{reference}/{reference}.1.bt2"
     params:
         fastas = lambda wildcards, input: ",".join(input)
     threads:
         5
     log:
-        stdout="results/logs/bowtie2_index/{reference}.log",
-        stderr="results/logs/bowtie2_index/{reference}.err" 
+        stdout="results/alignment/logs/bowtie2_index/{reference}.log",
+        stderr="results/alignment/logs/bowtie2_index/{reference}.err" 
+    conda:
+        "../envs/alignment.yaml"
     shell:
         "bowtie2-build --threads {threads} "
         "{params.fastas} "
-        "results/bowtie2_indices/{wildcards.reference}/{wildcards.reference} "
+        "results/alignment/bowtie2_index/{wildcards.reference}/{wildcards.reference} "
         "> {log.stdout} 2> {log.stderr}"
 
 rule bowtie2_map:
     input:
-        in1="results/trimmomatic/{sample}_trim_paired_R1.fastq.gz",
-        in2="results/trimmomatic/{sample}_trim_paired_R2.fastq.gz",
+        in1="results/preprocessing/trimmomatic/{sample}_trim_paired_R1.fastq.gz",
+        in2="results/preprocessing/trimmomatic/{sample}_trim_paired_R2.fastq.gz",
         bt2_index= lambda wildcards: get_bt2_index_file(wildcards.sample,pep)
     output:
-        temp("results/bowtie2/{sample}.bam")
+        temp("results/alignment/bowtie2/{sample}.bam")
     log:
-        stderr="results/logs/bowtie2/{sample}_bt2.log" 
+        stderr="results/alignment/logs/bowtie2/{sample}_bt2.log" 
     params:
         bt2_index= lambda wildcards: get_bt2_index(wildcards.sample,pep)    
     threads: 
         5
+    conda:
+        "../envs/alignment.yaml"
     shell:
         "bowtie2 -x {params.bt2_index} -p {threads} "
         "-1 {input.in1} -2 {input.in2} --phred33  "
@@ -81,21 +97,25 @@ rule bowtie2_map:
 
 rule bam_sort:
     input:
-        "results/bowtie2/{sample}.bam"
+        "results/alignment/bowtie2/{sample}.bam"
     output:
-        "results/bowtie2/{sample}_sorted.bam"
+        "results/alignment/bowtie2/{sample}_sorted.bam"
     log:
-        stderr="results/logs/bowtie2/{sample}_bt2_sort.log"
+        stderr="results/alignment/logs/bowtie2/{sample}_bt2_sort.log"
+    conda:
+        "../envs/alignment.yaml"
     shell:
         "samtools sort {input} > {output} 2> {log.stderr}"
 
 rule bam_index:
     input:
-        "results/bowtie2/{sample}_sorted.bam"
+        "results/alignment/bowtie2/{sample}_sorted.bam"
     output:
-        "results/bowtie2/{sample}_sorted.bam.bai"
+        "results/alignment/bowtie2/{sample}_sorted.bam.bai"
     log:
-        stdout="results/logs/bowtie2/{sample}_bt2_index.log",
-        stderr="results/logs/bowtie2/{sample}_bt2_index.log"
+        stdout="results/alignment/logs/bowtie2/{sample}_bt2_index.log",
+        stderr="results/alignment/logs/bowtie2/{sample}_bt2_index.log"
+    conda:
+        "../envs/alignment.yaml"
     shell:
         "samtools index {input} {output} > {log.stdout} 2> {log.stderr}"

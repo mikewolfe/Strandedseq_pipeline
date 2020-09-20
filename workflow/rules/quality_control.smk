@@ -60,7 +60,7 @@ rule fastqc_raw:
 rule fastqc_processed:
     message: "Running fastqc on {wildcards.sample} {wildcards.pair}"
     input:
-        "results/trimmomatic/{sample}_trim_paired_{pair}.fastq.gz"
+        "results/preprocessing/trimmomatic/{sample}_trim_paired_{pair}.fastq.gz"
     output:
         "results/quality_control/fastqc_processed/{sample}_trim_paired_{pair}_fastqc.html"
     threads: 1
@@ -111,15 +111,15 @@ rule ChIP_QC:
 
 rule deeptools_QC_fingerprint:
     input:
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
     output:
         outplot="results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint.png",
         rawcounts="results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint_counts.txt",
         qualmetrics="results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint_qual_metrics.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
     conda:
         "../envs/quality_control.yaml"
     threads:
@@ -139,13 +139,13 @@ rule deeptools_QC_fingerprint:
 
 rule deeptools_QC_multiBamSummary:
     input: 
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
     output:
         "results/quality_control/deeptools_QC/{group}_coverage_matrix.npz"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
     threads:
         10
     log:
@@ -211,14 +211,14 @@ rule deeptools_QC_corScatterplot:
 
 rule deeptools_QC_plotCoverage:
     input: 
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
     output:
         plot="results/quality_control/deeptools_QC/plotCoverage/{group}_plotCoverage.png",
         counts="results/quality_control/deeptools_QC/plotCoverage/{group}_plotCoverage_count.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
     threads:
         10
     log:
@@ -237,14 +237,14 @@ rule deeptools_QC_plotCoverage:
 
 rule deeptools_QC_plotCoverage_rmdups:
     input: 
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
     output:
         plot="results/quality_control/deeptools_QC/plotCoverage_rmdups/{group}_plotCoverage_rmdups.png",
         counts="results/quality_control/deeptools_QC/plotCoverage_rmdups/{group}_plotCoverage_count_rmdups.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
     threads:
         10
     log:
@@ -263,15 +263,15 @@ rule deeptools_QC_plotCoverage_rmdups:
 
 rule deeptools_QC_bamPEFragmentSize:
     input:
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
     output:
         plot="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.png",
         fragment_hist="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.txt",
         table="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize_table.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
     threads:
         10
     log:
