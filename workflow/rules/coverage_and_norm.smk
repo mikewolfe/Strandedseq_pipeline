@@ -50,7 +50,7 @@ def determine_files_for_log2ratio(config, pep, within):
         if RZ:
             ending += "RZ"
     samples = determine_extracted_samples(pep) 
-    outfiles = ["results/deeptools_log2ratio/%s_%s_%s.bw"%(sample, within, ending) for sample in samples]
+    outfiles = ["results/coverage_and_norm/deeptools_log2ratio/%s_%s_%s.bw"%(sample, within, ending) for sample in samples]
     return outfiles
 
 
@@ -58,18 +58,16 @@ def determine_files_for_log2ratio(config, pep, within):
 
 rule clean_coverage_and_norm:
     shell:
-        "rm -fr results/deeptools_coverage/ & "
-        "rm -fr results/deeptools_log2ratio/ & "
-        "rm -fr results/logs/deeptools_coverage/ & "
-        "rm -fr results/logs/deeptools_log2ratio"
+        "rm -fr results/coverage_and_norm/"
+
+rule run_coverage_and_norm:
+    input:
+        determine_files_for_log2ratio(config, pep, WITHIN)
 
 rule get_raw_coverage:
     input:
-        expand("results/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
+        expand("results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
 
-rule get_log2ratio_coverage:
-    input:
-        determine_files_for_log2ratio(config, pep, WITHIN)
 
 def determine_genome_size(sample, config, pep):
     genome = lookup_sample_metadata(sample, "genome", pep) 
@@ -92,14 +90,16 @@ rule deeptools_coverage_raw:
         inbam="results/bowtie2/{sample}_sorted.bam",
         ind="results/bowtie2/{sample}_sorted.bam.bai"
     output:
-        "results/deeptools_coverage/{sample}_raw.bw"
+        "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw"
     log:
-        stdout="results/logs/deeptools_coverage/{sample}_raw.log",
-        stderr="results/logs/deeptools_coverage/{sample}_raw.err"
+        stdout="results/coverage_and_norm/logs/deeptools_coverage/{sample}_raw.log",
+        stderr="results/coverage_and_norm/logs/deeptools_coverage/{sample}_raw.err"
     params:
         resolution = RES
     threads:
         5
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
         "bamCoverage --bam {input.inbam} --outFileName {output} "
         "--outFileFormat 'bigwig' "
@@ -110,13 +110,13 @@ rule deeptools_coverage_raw:
 
 rule deeptools_coverage:
     input:
-        inbam="results/bowtie2/{sample}_sorted.bam",
-        ind="results/bowtie2/{sample}_sorted.bam.bai"
+        inbam="results/alignment/bowtie2/{sample}_sorted.bam",
+        ind="results/alignment/bowtie2/{sample}_sorted.bam.bai"
     output:
-        "results/deeptools_coverage/{sample}_{norm}.bw"
+        "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw"
     log:
-        stdout="results/logs/deeptools_coverage/{sample}_{norm}.log",
-        stderr="results/logs/deeptools_coverage/{sample}_{norm}.err"
+        stdout="results/coverage_and_norm/logs/deeptools_coverage/{sample}_{norm}.log",
+        stderr="results/coverage_and_norm/logs/deeptools_coverage/{sample}_{norm}.err"
     params:
         resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep)
@@ -124,6 +124,8 @@ rule deeptools_coverage:
         norm="RPKM|CPM|BPM|RPGC"
     threads:
         5
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
         "bamCoverage --bam {input.inbam} --outFileName {output} --outFileFormat 'bigwig' "
         "--numberOfProcessors {threads} --binSize {params.resolution} "
@@ -136,23 +138,25 @@ rule deeptools_coverage:
 # helper for finding correct input sample
 def get_matching_input(sample, norm, pep):
    input_sample = lookup_sample_metadata(sample, "input_sample", pep)
-   return "results/deeptools_coverage/%s_%s.bw"%(input_sample, norm)
+   return "results/coverage_and_norm/deeptools_coverage/%s_%s.bw"%(input_sample, norm)
 
 rule deeptools_log2ratio:
     input:
-        ext= "results/deeptools_coverage/{sample}_{norm}.bw",
+        ext= "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
         inp= lambda wildcards: get_matching_input(wildcards.sample,wildcards.norm, pep)
     output:
-        "results/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|median"
     params: 
         resolution = RES
     log:
-        stdout="results/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.log",
-        stderr="results/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.err"
+        stdout="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.log",
+        stderr="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.err"
     threads:
         5
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
         "bigwigCompare -b1 {input.ext} -b2 {input.inp} --outFileName {output} "
         "--operation 'log2' "
@@ -161,29 +165,31 @@ rule deeptools_log2ratio:
 
 def get_input_bam(sample, pep):
     input_sample = lookup_sample_metadata(sample, "input_sample", pep)
-    return "results/bowtie2/%s_sorted.bam"%(input_sample),
+    return "results/alignment/bowtie2/%s_sorted.bam"%(input_sample),
 
 def get_input_bai(sample, pep):
     input_sample = lookup_sample_metadata(sample, "input_sample", pep)
-    return "results/bowtie2/%s_sorted.bam.bai"%(input_sample),
+    return "results/alignment/bowtie2/%s_sorted.bam.bai"%(input_sample),
 
 
 rule deeptools_SES_log2ratio:
     input:
-        ext= "results/bowtie2/{sample}_sorted.bam",
-        ind_ext= "results/bowtie2/{sample}_sorted.bam.bai",
+        ext= "results/alignment/bowtie2/{sample}_sorted.bam",
+        ind_ext= "results/alignment/bowtie2/{sample}_sorted.bam.bai",
         inp = lambda wildcards: get_input_bam(wildcards.sample, pep),
         inp_ext = lambda wildcards: get_input_bai(wildcards.sample, pep)
 
     output:
-        "results/deeptools_log2ratio/{sample}_SES_log2ratio.bw"
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_SES_log2ratio.bw"
     log:
-        stdout="results/logs/deeptools_log2ratio/{sample}_SES_log2ratio.log",
-        stderr="results/logs/deeptools_log2ratio/{sample}_SES_log2ratio.err"
+        stdout="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_SES_log2ratio.log",
+        stderr="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_SES_log2ratio.err"
     threads:
         5
     params: 
         resolution = RES,
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
         "bamCompare --bamfile1 {input.ext} --bamfile2 {input.inp} --outFileName {output} "
         "--outFileFormat 'bigwig' --scaleFactorsMethod 'SES' --operation 'log2' "
@@ -194,9 +200,9 @@ rule deeptools_SES_log2ratio:
 
 rule bwtools_median:
     input:
-        "results/deeptools_coverage/{sample}_raw.bw"
+        "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw"
     output:
-        "results/deeptools_coverage/{sample}_median.bw"
+        "results/coverage_and_norm/deeptools_coverage/{sample}_median.bw"
     params:
         resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
@@ -204,6 +210,8 @@ rule bwtools_median:
     log:
         stdout="logs/bwtools/{sample}_median.log",
         stderr="logs/bwtools/{sample}_median.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
        "workflow/scripts/bwtools.py "
@@ -214,18 +222,20 @@ rule bwtools_median:
 
 rule bwtools_RobustZ:
     input:
-        "results/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
     output:
-        "results/deeptools_log2ratio/{sample}_{norm}_log2ratioRZ.bw"
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratioRZ.bw"
     log:
-        stdout="results/logs/bwtools/{sample}_{norm}_log2ratioRZ.log",
-        stderr="results/logs/bwtools/{sample}_{norm}_log2ratioRZ.err"
+        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratioRZ.log",
+        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratioRZ.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median"
     params:
         resolution = RES,
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
         chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
+    conda:
+        "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
        "workflow/scripts/bwtools.py "
