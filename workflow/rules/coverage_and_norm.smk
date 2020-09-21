@@ -86,14 +86,14 @@ rule deeptools_coverage:
         "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
 
 # helper for finding correct input sample
-def get_matching_input(sample, norm, pep):
+def get_log2ratio_matching_input(sample, norm, pep):
    input_sample = lookup_sample_metadata(sample, "input_sample", pep)
    return "results/coverage_and_norm/deeptools_coverage/%s_%s.bw"%(input_sample, norm)
 
 rule deeptools_log2ratio:
     input:
         ext= "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
-        inp= lambda wildcards: get_matching_input(wildcards.sample,wildcards.norm, pep)
+        inp= lambda wildcards: get_log2ratio_matching_input(wildcards.sample,wildcards.norm, pep)
     output:
         "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
     wildcard_constraints:
@@ -158,8 +158,8 @@ rule bwtools_median:
         genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
         chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     log:
-        stdout="logs/bwtools/{sample}_median.log",
-        stderr="logs/bwtools/{sample}_median.err"
+        stdout="results/coverage_and_norm/logs/bwtools/{sample}_median.log",
+        stderr="results/coverage_and_norm/logs/bwtools/{sample}_median.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
