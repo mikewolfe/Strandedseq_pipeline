@@ -1,0 +1,8 @@
+channels:
+    - conda-forge
+    - bioconda
+dependencies:
+    - numpy=1.19.0
+    - scipy=1.5.2
+    - matplotlib=3.3.2
+    - macs2=2.2.7.1
