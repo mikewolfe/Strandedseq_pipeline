@@ -1,0 +1,3 @@
+[submodule "workflow/CMARRT_python"]
+	path = workflow/CMARRT_python
+	url = https://github.com/mikewolfe/CMARRT_python
