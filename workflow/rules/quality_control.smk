@@ -77,7 +77,7 @@ rule fastqc_processed:
 # ChIP QC will be done by groups thus we need to write a few helpers
 
 def determine_grouping_category(config):
-    if "group_by" in config["quality_control"]:
+    if "quality_control" in config and "group_by" in config["quality_control"]:
         grouping_category = config["quality_control"]["group_by"]
     else:
         grouping_category = "genome"

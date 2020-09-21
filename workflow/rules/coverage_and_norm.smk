@@ -1,51 +1,16 @@
 ## HELPER FUNCTIONS inherited from parent SnakeFile:
 # samples(pep)
 # lookup_sample_metadata(sample, key, pep)
+# GLOBAL CONSTANTS inherited from parent Snakefile:
+# RES - resolution of coverage
+# WITHIN - normalization to perform within samples
 ## TODO
 # allow bwtools to deal with genomes with more than one chromosome or contig
 
 
-def determine_resolution(config):
-    try:
-        resolution = config["coverage"]["resolution"]
-    except KeyError:
-        print(
-        """
-        Could not find specification for resolution in config file. I.e.
-
-        coverage:
-            resolution: N
-
-        defaulting to 5 bp resolution
-        """)
-        resolution = 5
-        
-    return resolution
-
-def determine_within_normalization(config):
-    try:
-        within = config["normalization"]["within"]
-    except KeyError:
-        print(
-        """
-        Could not find specification for normalization within a sample in config file. I.e.
-
-        normalization:
-            within: X
-
-        defaulting to normalization by median signal in bins
-        """)
-        within = "median"
-        
-    return within
-
-# SET CONSTANTS FOR COVERAGE CALCULATIONS
-RES = determine_resolution(config)
-WITHIN = determine_within_normalization(config)
-
 def determine_files_for_log2ratio(config, pep, within):
     ending = "log2ratio"
-    if "RobustZ" in config["normalization"]:
+    if "normalization" in config and "RobustZ" in config["normalization"]:
         RZ = config["normalization"]["RobustZ"]
         if RZ:
             ending += "RZ"
@@ -69,21 +34,6 @@ rule get_raw_coverage:
         expand("results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
 
 
-def determine_genome_size(sample, config, pep):
-    genome = lookup_sample_metadata(sample, "genome", pep) 
-    try:
-        genome_size = config["reference"][genome]["genome_size"]
-    except KeyError:
-        raise KeyError(
-        """
-        Cannot find genome_size for reference %s, make sure genome_size is
-        specified in the config file. I.e.
-        reference:
-            %s:
-                genome_size: NNNNN
-        """%(genome, genome))
-                
-    return genome_size
 
 rule deeptools_coverage_raw:
     input:
@@ -244,3 +194,27 @@ rule bwtools_RobustZ:
        "--chrm_length {params.genome_size} " 
        "--res {params.resolution} "
        "--operation RobustZ > {log.stdout} 2> {log.stderr}"
+
+rule bwtools_bw2npy:
+    input:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.bw"
+    output:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.npy"
+    params: 
+        resolution = RES,
+        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
+        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.log",
+        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.err"
+    wildcard_constraints:
+        norm="RPKM|CPM|BPM|RPGC|count|SES|median"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py "
+       "{input} {output} --fr bigwig --to numpy --chrm_name "
+       "{params.chrom_name} --chrm_length {params.genome_size} "
+       "--res {params.resolution} "
+       "> {log.stdout} 2> {log.stderr}"
