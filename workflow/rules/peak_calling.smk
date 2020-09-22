@@ -7,16 +7,7 @@
 # WITHIN - normalization to perform within samples
 ## TODO
 # allow CMARRT to deal with genomes with more than one chromosome or contig
-
-# HELPER FUNCTIONS
-def determine_final_normalization(config, pep):
-    ending = "log2ratio"
-    if "normalization" in config and "RobustZ" in config["normalization"]:
-        RZ = config["normalization"]["RobustZ"]
-        if RZ:
-            ending += "RZ"
-    return ending
-        
+ 
 rule clean_peak_calling:
     shell:
         "rm -fr results/peak_calling"
@@ -26,7 +17,7 @@ rule run_peak_calling:
         expand("results/peak_calling/cmarrt/{sample}_{within}_{ending}.narrowPeak",\
         sample = determine_extracted_samples(pep),\
         within = WITHIN,\
-        ending = determine_final_normalization(config, pep)),
+        ending = ENDING),
         expand("results/peak_calling/macs2/{sample}_peaks.xls",\
         sample = determine_extracted_samples(pep))
 

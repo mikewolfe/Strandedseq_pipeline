@@ -4,19 +4,9 @@
 # GLOBAL CONSTANTS inherited from parent Snakefile:
 # RES - resolution of coverage
 # WITHIN - normalization to perform within samples
+# ENDING - log2ratio or log2ratioRZ
 ## TODO
 # allow bwtools to deal with genomes with more than one chromosome or contig
-
-
-def determine_files_for_log2ratio(config, pep, within):
-    ending = "log2ratio"
-    if "normalization" in config and "RobustZ" in config["normalization"]:
-        RZ = config["normalization"]["RobustZ"]
-        if RZ:
-            ending += "RZ"
-    samples = determine_extracted_samples(pep) 
-    outfiles = ["results/coverage_and_norm/deeptools_log2ratio/%s_%s_%s.bw"%(sample, within, ending) for sample in samples]
-    return outfiles
 
 
 # OVERALL RULES
@@ -26,14 +16,15 @@ rule clean_coverage_and_norm:
         "rm -fr results/coverage_and_norm/"
 
 rule run_coverage_and_norm:
-    input:
-        determine_files_for_log2ratio(config, pep, WITHIN)
+    input:       
+        expand("results/coverage_and_norm/deeptools_log2ratio/{sample}_{within}_{ending}.narrowPeak",\
+        sample = determine_extracted_samples(pep),\
+        within = WITHIN,\
+        ending = ENDING)
 
 rule get_raw_coverage:
     input:
         expand("results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
-
-
 
 rule deeptools_coverage_raw:
     input:
