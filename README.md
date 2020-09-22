@@ -80,7 +80,7 @@ Input samples should leave this field blank.
 
 An example of a sample sheet is included at [pep/test_samples.csv](pep/test_samples.csv).
 
-Additionally, the sample sheet can be augmented with a required `config.yaml` file. In the included test example this is used to replace the `file_path` field with a specific location. This example can be found here [pep/config.yaml](pep/test_samples.csv).
+Additionally, the sample sheet can be augmented with a required `config.yaml` file. In the included test example this is used to replace the `file_path` field with a specific location. This example can be found here [pep/config.yaml](pep/config.yaml).
 
 The `pep/config.yaml` should be edited to point towards your `pep/samples.csv` file. If you create your `samples.csv` file with excel be sure to save it as `comma seperated values` not any of the other encodings for `.csv`.
 
