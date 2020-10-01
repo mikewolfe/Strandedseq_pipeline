@@ -56,25 +56,3 @@ peak_calling:
         U00096.3:
             # call broad peaks?
             broad: true
-
-
-# parameters for summary plots
-
-gffs:
-    GeneProducts: "/mnt/scratch/mbwolfe/genomes/regulondb/GeneProductSet_U00096_3.bed"
-    Operons: "/mnt/scratch/mbwolfe/genomes/regulondb/OperonSet_U00096_3.bed"
-    rRNAs: "/mnt/scratch/mbwolfe/genomes/regulondb/rRNASet_U00096_3.bed"
-    sRNAs: "/mnt/scratch/mbwolfe/genomes/regulondb/sRNASet_U00096_3.bed"
-    tRNAs: "/mnt/scratch/mbwolfe/genomes/regulondb/tRNASet_U00096_3.bed"
-    Rel_SC: "annotations/supercoiling/RelSC_GeneProductSet_U00096_3.bed"
-    Hyp_SC: "annotations/supercoiling/HypSC_GeneProductSet_U00096_3.bed"
-    HighExp: "annotations/expression/HighExpression_U00096_3.bed"
-    LowExp: "annotations/expression/LowExpression_U00096_3.bed"
-    PromoterProximal: "annotations/regulator_trafficking/PromoterProximal_U00096_3.bed"
-    NoPromoterProximal: "annotations/regulator_trafficking/NoPromoterProximal_U00096_3.bed"
-    HQ_TUs: "annotations/regulator_trafficking/HQ_TUs_U00096_3.bed"
-    HE_HQ_TUs: "annotations/regulator_trafficking/HE_HQ_TUs_U00096_3.bed"
-    nusG_rac_BSTs: "annotations/termination/BSTs_nusg_rac_U00096_3.bed"
-    nusG_MDS42_BSTs: "annotations/termination/BSTs_nusg_mds42_U00096_3.bed"
-    SEndseq_TUs: "annotations/sendseq/SEndseq_TUs_U00096_3.bed"
-
