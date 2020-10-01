@@ -95,8 +95,7 @@ include: "workflow/rules/peak_calling.smk"
 
 rule run_all:
     input: 
-        "results/quality_control/read_qc.done",
-        "results/quality_control/ChIP_qc.done",
+        "results/quality_control/multiqc_report.html",
         expand("results/peak_calling/cmarrt/{sample}_{within}_{ending}.narrowPeak",\
         sample = determine_extracted_samples(pep),\
         within = WITHIN,\

@@ -10,7 +10,7 @@ characteristics:
 - Organisms with a single chromosome
 
 However, support for multiple chromosomes or reference genomes that include additional
-contigs or chromosomes is a high priority development goal.
+contigs is a high priority development goal.
 
 # What the pipeline does
 Starting from raw fastq files this pipeline does the following:
@@ -44,15 +44,35 @@ conda create -n ChIPseq_pipeline snakemake=5.24.2 peppy
 conda activate ChIPseq_pipeline
 ```
 
+**Note** If you are using a computational cluster that requires job management
+software, you may want to install that with your environment as well.
+For example, if you are using an `htcondor`-managed server you would
+instead create your environment like so:
+```
+conda create -n ChIPseq_pipeline snakemake=5.24.2 peppy htcondor=8.9.5
+conda activate ChIPseq_pipeline
+```
+
 Now you can pull the pipeline from github using:
 ```
 git clone --recurse-submodules https://github.com/mikewolfe/ChIPseq_pipeline/
 ```
+
 And you can change into the newly cloned `ChIPseq_pipeline` directory and test your installation with:
 ```
 snakemake --use-conda --cores 10
 ```
-Which will run the entire pipeline using the provided test data consisting of small example fastqs heavily downsampled from real ChIP data. 
+
+Or if using a cluster with job management software you can run this
+with an environment-specific
+[profile](https://snakemake.readthedocs.io/en/v5.1.4/executable.html#profiles).
+For example:
+```
+snakemake --use-conda --cores 10 --profile htcondor
+```
+
+
+This will run the entire pipeline using the provided test data consisting of small example fastqs heavily downsampled from real ChIP data. 
 
 The first time you run the pipeline it will need to create dedicated `conda` environments for each module which will take some time. Afterwards, it will run quickly. For more information on using `conda` with `snakemake` including how to set things up to run offline check out the documentation [here](https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html#integrated-package-management).
 
@@ -80,7 +100,7 @@ Input samples should leave this field blank.
 
 An example of a sample sheet is included at [pep/test_samples.csv](pep/test_samples.csv).
 
-Additionally, the sample sheet can be augmented with a required `config.yaml` file. In the included test example this is used to replace the `file_path` field with a specific location. This example can be found here [pep/config.yaml](pep/config.yaml).
+Additionally, the sample sheet can be augmented with a required `config.yaml` file. In the included test example this is used to replace the `file_path` field with a specific location. This example can be found at [pep/config.yaml](pep/config.yaml).
 
 The `pep/config.yaml` should be edited to point towards your `pep/samples.csv` file. If you create your `samples.csv` file with excel be sure to save it as `comma seperated values` not any of the other encodings for `.csv`.
 
