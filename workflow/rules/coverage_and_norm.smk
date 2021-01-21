@@ -17,7 +17,7 @@ rule clean_coverage_and_norm:
 
 rule run_coverage_and_norm:
     input:       
-        expand("results/coverage_and_norm/deeptools_log2ratio/{sample}_{within}_{ending}.narrowPeak",\
+        expand("results/coverage_and_norm/deeptools_log2ratio/{sample}_{within}_{ending}.bw",\
         sample = determine_extracted_samples(pep),\
         within = WITHIN,\
         ending = ENDING)
