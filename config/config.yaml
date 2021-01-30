@@ -9,14 +9,28 @@ reference:
         # below the pipeline will attempt to pull this file from NCBI by
         # accession number
         genbanks: 
-                - resources/genbanks/U00096.3.gbk
+            U00096.3: resources/genbanks/U00096.3.gbk
         # This is the fasta file for each chromosome in the genome
         # If specified in this location then it is automatically parsed
         # from the genbank.
         fastas:
-                - results/alignment/process_genbank/U00096.3/U00096.3.fna
+            - results/alignment/process_genbank/U00096.3/U00096.3.fna
         # This is the expected total size in basepair of the final genome
         genome_size: 4641652
+    ZM4:
+        genbanks:
+            ZM4: resources/genbanks/CP023715.1.gbk
+            pZM32: resources/genbanks/CP023716.1.gbk
+            pZM33: resources/genbanks/CP023717.1.gbk
+            pZM36: resources/genbanks/CP023718.1.gbk
+            pZM39: resources/genbanks/CP023719.1.gbk
+        fastas:
+            - results/alignment/process_genbank/ZM4/ZM4.fna
+            - results/alignment/process_genbank/ZM4/pZM32.fna
+            - results/alignment/process_genbank/ZM4/pZM33.fna
+            - results/alignment/process_genbank/ZM4/pZM36.fna
+            - results/alignment/process_genbank/ZM4/pZM39.fna
+        genome_size: 2058755
 
 # Options to control genome coverage calculations
 coverage:

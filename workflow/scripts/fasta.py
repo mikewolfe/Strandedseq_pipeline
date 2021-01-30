@@ -4,6 +4,7 @@ fasta
 Module to read, write, and manipulate fasta files.
 
 """
+import logging
 
 def complement(sequence):
     """Complement a nucleotide sequence
@@ -259,8 +260,12 @@ class FastaFile(object):
         Returns:
             None
         """
-        self.data[entry.chrm_name()]= entry
-        self.names.append(entry.chrm_name())
+        chrm_name = entry.chrm_name()
+        if chrm_name not in self.data:
+            self.names.append(chrm_name)
+        else:
+            logging.warning("Entry %s already exists. Overwriting"%(chrm_name))
+        self.data[chrm_name]= entry
 
     def chrm_names(self):
         return self.data.keys()
