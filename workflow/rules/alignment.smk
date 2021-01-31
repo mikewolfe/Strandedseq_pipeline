@@ -64,7 +64,8 @@ rule combine_fastas:
         lambda wildcards: get_genome_fastas(config, wildcards.genome)
     output:
         "results/alignment/combine_fasta/{genome}/{genome}.fa",
-        "results/alignment/combine_fasta/{genome}/{genome}_contig_sizes.tsv"
+        "results/alignment/combine_fasta/{genome}/{genome}_contig_sizes.tsv",
+        "results/alignment/combine_fasta/{genome}/{genome}_mappable_size.txt"
     log:
         stdout="results/alignment/logs/combine_fasta/{genome}/{genome}.log",
         stderr="results/alignment/logs/combine_fasta/{genome}/{genome}.err"

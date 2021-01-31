@@ -52,7 +52,8 @@ rule deeptools_coverage_raw:
 rule deeptools_coverage:
     input:
         inbam="results/alignment/bowtie2/{sample}_sorted.bam",
-        ind="results/alignment/bowtie2/{sample}_sorted.bam.bai"
+        ind="results/alignment/bowtie2/{sample}_sorted.bam.bai",
+        genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
     output:
         "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw"
     log:
@@ -60,7 +61,7 @@ rule deeptools_coverage:
         stderr="results/coverage_and_norm/logs/deeptools_coverage/{sample}_{norm}.err"
     params:
         resolution = RES,
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep)
+        genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC"
     threads:
@@ -146,8 +147,6 @@ rule bwtools_median:
         "results/coverage_and_norm/deeptools_coverage/{sample}_median.bw"
     params:
         resolution = RES,
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
-        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     log:
         stdout="results/coverage_and_norm/logs/bwtools/{sample}_median.log",
         stderr="results/coverage_and_norm/logs/bwtools/{sample}_median.err"
@@ -156,8 +155,7 @@ rule bwtools_median:
     shell:
        "python3 "
        "workflow/scripts/bwtools.py "
-       "{input} {output} --fr bigwig --to bigwig --chrm_name "
-       "{params.chrom_name} --chrm_length {params.genome_size} "
+       "{input} {output} "
        "--res {params.resolution} --operation Median_norm "
        "> {log.stdout} 2> {log.stderr}"
 
@@ -173,39 +171,35 @@ rule bwtools_RobustZ:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median"
     params:
         resolution = RES,
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
-        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
        "workflow/scripts/bwtools.py "
-       "{input} {output} --fr bigwig --to bigwig --chrm_name "
-       "{params.chrom_name} "
-       "--chrm_length {params.genome_size} " 
+       "{input} {output} "
        "--res {params.resolution} "
        "--operation RobustZ > {log.stdout} 2> {log.stderr}"
 
-rule bwtools_bw2npy:
-    input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.bw"
-    output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.npy"
-    params: 
-        resolution = RES,
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
-        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
-    log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.err"
-    wildcard_constraints:
-        norm="RPKM|CPM|BPM|RPGC|count|SES|median"
-    conda:
-        "../envs/coverage_and_norm.yaml"
-    shell:
-       "python3 "
-       "workflow/scripts/bwtools.py "
-       "{input} {output} --fr bigwig --to numpy --chrm_name "
-       "{params.chrom_name} --chrm_length {params.genome_size} "
-       "--res {params.resolution} "
-       "> {log.stdout} 2> {log.stderr}"
+#rule bwtools_bw2npy:
+#    input:
+#        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.bw"
+#    output:
+#        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.npy"
+#    params: 
+#        resolution = RES,
+#        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
+#        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
+#    log:
+#        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.log",
+#        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{logratio}_bw2npy.err"
+#    wildcard_constraints:
+#        norm="RPKM|CPM|BPM|RPGC|count|SES|median"
+#    conda:
+#        "../envs/coverage_and_norm.yaml"
+#    shell:
+#       "python3 "
+#       "workflow/scripts/bwtools.py "
+#       "{input} {output} --fr bigwig --to numpy --chrm_name "
+#       "{params.chrom_name} --chrm_length {params.genome_size} "
+#       "--res {params.resolution} "
+#       "> {log.stdout} 2> {log.stderr}"

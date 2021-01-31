@@ -38,21 +38,15 @@ def determine_resolution(config):
         
     return resolution
 
-def determine_genome_size(sample, config, pep):
-    genome = lookup_sample_metadata(sample, "genome", pep) 
-    if "genome_size" in config["reference"][genome]:
-        genome_size = config["reference"][genome]["genome_size"]
-    else:
-        raise KeyError(
-        """
-        Cannot find genome_size for reference %s, make sure genome_size is
-        specified in the config file. I.e.
-        reference:
-            %s:
-                genome_size: NNNNN
-        """%(genome, genome))
-                
-    return genome_size
+def determine_effective_genome_size_file(sample, config, pep):
+    genome = lookup_sample_metadata(sample, "genome", pep)
+    return "results/alignment/combine_fasta/%s/%s_mappable_size.txt"%(genome, genome)
+
+def determine_effective_genome_size(sample, config, pep):
+    infile = determine_effective_genome_size_file(sample, config, pep)
+    with open(infile, mode = "r") as inf:
+        size = inf.readline().rstrip()  
+    return size
 
 def determine_within_normalization(config):
     if "normalization" in config and "within" in config["normalization"]:

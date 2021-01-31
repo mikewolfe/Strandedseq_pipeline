@@ -20,9 +20,20 @@ if __name__ == "__main__":
         chrm_name = entry.chrm_name()
         lengths[chrm_name] = len(entry)
 
+    # Figure out total size of each chromosome
     with open(genome_name + "_contig_sizes.tsv", mode = "w") as outf:
         for chrm, length in lengths.items():
             outf.write("%s\t%s\n"%(chrm, length))
+
+    # figure out total mappable size of the genome
+    with open(genome_name + "_mappable_size.txt", mode = "w") as outf:
+        N_size = 0
+        total_size = 0
+        for entry in final_fasta:
+            N_size += entry.seq.count("N")
+            total_size += len(entry)
+        outf.write("%i"%(total_size-N_size))
+    # Write out final fasta
     with open(genome_name + ".fa", mode = "w") as outf:
         final_fasta.write(outf)
 
