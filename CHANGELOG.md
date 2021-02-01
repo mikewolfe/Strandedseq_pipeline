@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Full support for organisms with multiple contigs/chromosomes (#5)
+- Full support for genomes with multiple contigs/chromosomes ([#5](https://github.com/mikewolfe/ChIPseq_pipeline/issues/5))
 
 ### Changed
 - Config syntax for specifying genome inputs
 
 ### Bug fixes
-- Fixed an issue when running `coverage_and_norm` module only (#3)
+- Fixed an issue when running `coverage_and_norm` module only ([#3](https://github.com/mikewolfe/ChIPseq_pipeline/issues/3))
