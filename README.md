@@ -7,10 +7,7 @@ aimed at processing ChIP-seq samples with the following
 characteristics:
 
 - Paired-end short-read illumina sequencing data
-- Organisms with a single chromosome
-
-However, support for multiple chromosomes or reference genomes that include additional
-contigs is a high priority development goal.
+- Smaller genome sizes such as bacterial genomes
 
 # What the pipeline does
 Starting from raw fastq files this pipeline does the following:
@@ -27,7 +24,6 @@ In addition this pipeline uses [`multiqc`](https://multiqc.info/) to compile the
 following quality control metrics into an interactive html report:
 - Read QC using [`fastqc`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) both before and after preprocessing
 - A large number of ChIP quality control metrics calculated by [`deeptools`](https://deeptools.readthedocs.io/en/latest/)
-
 
 # Installing the pipeline
 
@@ -144,3 +140,9 @@ Many of later modules are dependent on the earlier modules and running a later m
 
 If you run into any issues with the pipeline and would like help please submit it to the Issues page. Please include your `config/config.yaml` file, your `pep/config.yaml` file, your `pep/samples.yaml` file, and the output from `snakemake` that includes your error.
 
+# Version history
+
+Currently at version 0.0.0
+
+See the [Changelog](CHANGELOG.md) for version history and upcoming
+features.
