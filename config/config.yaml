@@ -15,8 +15,6 @@ reference:
         # from the genbank.
         fastas:
             - results/alignment/process_genbank/U00096.3/U00096.3.fna
-        # This is the expected total size in basepair of the final genome
-        genome_size: 4641652
     ZM4:
         genbanks:
             ZM4: resources/genbanks/CP023715.1.gbk
@@ -30,8 +28,6 @@ reference:
             - results/alignment/process_genbank/ZM4/pZM33.fna
             - results/alignment/process_genbank/ZM4/pZM36.fna
             - results/alignment/process_genbank/ZM4/pZM39.fna
-        genome_size: 2058755
-
 # Options to control genome coverage calculations
 coverage:
     # what resolution in bp do you want the coverage to be calculated?
@@ -53,20 +49,30 @@ quality_control:
 
 # Options to control peak calling
 peak_calling:
-    #    # Options that control CMARRT calling
-    #    cmarrt:
-    #        # Can specify individual parameters based on a column
-    #        group_by: genome
-    #        # for each value in the column specify the parameters
-    #        U00096.3:
-    #            # Half the size of the window in *entries* thus this would be 25
-    #            # * 5 bp resolution for a half window size of 125 bp
-    #            wi: 25
-    #            # Number of entries to consolidate peaks over i.e. two peaks within
-    #            # 10 * 5bp = 50 bp will get merged into one peak.
-    #            consolidate: 10
+        # Options that control CMARRT calling
+    cmarrt:
+            # Can specify individual parameters based on a column
+        group_by: genome
+            # for each value in the column specify the parameters
+        U00096.3:
+                # Half the size of the window in *entries* thus this would be 25
+                # * 5 bp resolution for a half window size of 125 bp
+            wi: 25
+                # Number of entries to consolidate peaks over i.e. two peaks within
+                # 10 * 5bp = 50 bp will get merged into one peak.
+            consolidate: 10
+        ZM4:
+                # Half the size of the window in *entries* thus this would be 25
+                # * 5 bp resolution for a half window size of 125 bp
+            wi: 25
+                # Number of entries to consolidate peaks over i.e. two peaks within
+                # 10 * 5bp = 50 bp will get merged into one peak.
+            consolidate: 10
     macs2:
         group_by: genome
         U00096.3:
             # call broad peaks?
             broad: true
+        ZM4:
+            # call broad peaks?
+            broad: false

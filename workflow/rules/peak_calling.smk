@@ -5,8 +5,6 @@
 # GLOBAL CONSTANTS inherited from parent Snakefile:
 # RES - resolution of coverage
 # WITHIN - normalization to perform within samples
-## TODO
-# allow CMARRT to deal with genomes with more than one chromosome or contig
  
 rule clean_peak_calling:
     shell:
@@ -51,7 +49,7 @@ def determine_cmarrt_params(sample, config, pep):
 
 rule cmarrt_call_peaks:
     input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.npy"
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.bw"
     output:
         "results/peak_calling/cmarrt/{sample}_{norm}_{logratio}.narrowPeak"
     log:
@@ -63,17 +61,14 @@ rule cmarrt_call_peaks:
         peak_vals = lambda wildcards: determine_cmarrt_params(wildcards.sample, config, pep),
         outpre = lambda wildcards: "results/peak_calling/cmarrt/%s_%s_%s"%(wildcards.sample, wildcards.norm, wildcards.logratio),
         resolution = RES,
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
-        chrom_name = lambda wildcards: lookup_sample_metadata(wildcards.sample, "genome", pep)
     conda:
         "../envs/peak_calling.yaml"
     shell:
         "python3 "
-        "workflow/CMARRT_python/run_cmarrt.py "
+        "workflow/CMARRT_python/run_cmarrt_bigwig.py "
         " {input} {params.peak_vals[wi]} "
-        "{params.chrom_name} -o {params.outpre} "
-        "--resolution {params.resolution} --np_start 0 "
-        "--np_end {params.genome_size} --input_numpy "
+        "-o {params.outpre} "
+        "--resolution {params.resolution} "
         "--consolidate {params.peak_vals[consolidate]} --plots > {log.stdout} 2> {log.stderr}"
 
 
@@ -103,14 +98,15 @@ def determine_macs2_params(sample, config, pep):
 rule macs2_call_peaks:
     input:
         ext = "results/alignment/bowtie2/{sample}_sorted.bam",
-        inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep)
+        inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep),
+        genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
     output:
         "results/peak_calling/macs2/{sample}_peaks.xls"
     log:
         stdout="results/peak_calling/logs/macs2/{sample}_macs2.log",
         stderr="results/peak_calling/logs/macs2/{sample}_macs2.err"
     params:
-        genome_size = lambda wildcards: determine_genome_size(wildcards.sample, config, pep),
+        genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep),
         peak_vals = lambda wildcards: determine_macs2_params(wildcards.sample, config, pep),
         
     conda:

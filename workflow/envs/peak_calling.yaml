@@ -6,3 +6,4 @@ dependencies:
     - scipy=1.5.2
     - matplotlib=3.3.2
     - macs2=2.2.7.1
+    - pybigwig=0.3.17

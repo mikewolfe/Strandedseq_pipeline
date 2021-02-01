@@ -128,3 +128,4 @@ if __name__ == "__main__":
 
     # write out file
     write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res)
+    inf.close()

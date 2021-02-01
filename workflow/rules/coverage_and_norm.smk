@@ -5,8 +5,6 @@
 # RES - resolution of coverage
 # WITHIN - normalization to perform within samples
 # ENDING - log2ratio or log2ratioRZ
-## TODO
-# allow bwtools to deal with genomes with more than one chromosome or contig
 
 
 # OVERALL RULES

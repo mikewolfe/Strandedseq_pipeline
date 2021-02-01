@@ -5,4 +5,5 @@ sample_modifiers:
         attributes: [file_path]
         sources:
             source1: "raw/"
+            source2: "test/"
 
