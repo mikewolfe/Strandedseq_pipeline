@@ -48,6 +48,13 @@ def determine_effective_genome_size(sample, config, pep):
         size = inf.readline().rstrip()  
     return size
 
+def determine_masked_regions_file(config, genome):
+    if "masked_regions" in config["reference"][genome]:
+        outfile = config["reference"][genome]["masked_regions"]
+    else:
+        outfile = None
+    return outfile
+
 def determine_within_normalization(config):
     if "normalization" in config and "within" in config["normalization"]:
         within = config["normalization"]["within"]

@@ -58,6 +58,14 @@ rule process_genbank:
          "--chrm '{wildcards.contig}'  "
          " > {output} 2> {log.stderr}"
 
+def masked_regions_file_for_combine_fastas(config, genome):
+    outfile = determine_masked_regions_file(config, genome)
+    if outfile is not None:
+        out = "--masked_regions %s"%(outfile)
+    else:
+        out = ""
+    return out
+
 rule combine_fastas:
     message: "Generating fasta for genome {wildcards.genome}"
     input:
@@ -70,11 +78,14 @@ rule combine_fastas:
         stdout="results/alignment/logs/combine_fasta/{genome}/{genome}.log",
         stderr="results/alignment/logs/combine_fasta/{genome}/{genome}.err"
     threads: 1
+    params:
+        masked_regions = lambda wildcards: masked_regions_file_for_combine_fastas(config, wildcards.genome)
     conda:
         "../envs/alignment.yaml"
     shell:
          "python3 workflow/scripts/combine_fasta.py "
          "results/alignment/combine_fasta/{wildcards.genome}/{wildcards.genome} "
+         "{params.masked_regions} "
          "{input} > {log.stdout} 2> {log.stderr}"
     
 rule bowtie2_index:

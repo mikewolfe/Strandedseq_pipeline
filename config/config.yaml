@@ -15,6 +15,7 @@ reference:
         # from the genbank.
         fastas:
             - results/alignment/process_genbank/U00096.3/U00096.3.fna
+        masked_regions: test/ecoli_rrns.bed
     ZM4:
         genbanks:
             ZM4: resources/genbanks/CP023715.1.gbk
