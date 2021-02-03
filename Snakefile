@@ -78,6 +78,22 @@ def determine_final_normalization(config):
         if RZ:
             ending += "RZ"
     return ending
+
+def determine_pseudocount(config):
+    if "normalization" in config and "pseudocount" in config["normalization"]:
+        pseudocount = config["normalization"]["pseudocount"]
+    else:
+        logger.warning(
+        """
+        Could not find specification for a pseudocount in config file. I.e.
+
+        normalization:
+            pseudocount: 1
+
+        defaulting to a pseudocount of 0
+        """)
+        pseudocount = 0
+    return pseudocount
     
 RES = determine_resolution(config)
 WITHIN = determine_within_normalization(config)

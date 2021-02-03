@@ -103,18 +103,22 @@ rule deeptools_log2ratio:
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|median"
     params: 
-        resolution = RES
+        resolution = RES,
+        pseudocount = determine_pseudocount(config)
     log:
         stdout="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.log",
         stderr="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.err"
     threads:
         5
+
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
         "bigwigCompare -b1 {input.ext} -b2 {input.inp} --outFileName {output} "
         "--operation 'log2' "
         "--binSize {params.resolution} "
+        "--pseudocount {params.pseudocount} "
+        "--skipZeroOverZero --skipNonCoveredRegions "
         "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr}"
 
 def get_input_bam(sample, pep):

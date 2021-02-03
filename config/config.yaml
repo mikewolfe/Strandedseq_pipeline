@@ -40,6 +40,10 @@ normalization:
     # RPKM, CPM, BPM, RPGC, median, and SES. See deeptools manual for
     # details on these normalization methods.
     within: median
+    # add a pseudocount to numerator and denominator in log2ratio
+    # set this to zero if you don't want to add a pseudocount. Note
+    # that bigwigs will not display in IGV if they have nans or infs
+    pseudocount: 1
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
 
