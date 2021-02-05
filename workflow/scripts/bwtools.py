@@ -4,7 +4,7 @@ import pyBigWig
 import numpy as np
 import arraytools
 
-def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = None):
+def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1):
     """
     Convert a set of arrays for each contig to a bigwig file
     
@@ -20,8 +20,16 @@ def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = None):
         chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
         outf.addHeader(chrm_list)
         for key in chrm_dict.keys():
-            outf.addEntries(key, 0, values=arrays[key], span = res, step = res)
-
+            this_array = arrays[key]
+            # make sure nans don't get added to the bw file
+            is_a_nan = np.isnan(this_array)
+            starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
+            ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
+            if len(ends) != len(starts):
+                ends = np.append(ends, chrm_dict[key])
+            names = np.array([key]*len(starts))
+            outf.addEntries(names[~is_a_nan], starts[~is_a_nan], 
+                    ends = ends[~is_a_nan], values=this_array[~is_a_nan])
 
 def bigwig_to_arrays(bw, res = None):
     """
@@ -75,9 +83,9 @@ def RobustZ_transform(arrays):
 
     """
     from scipy import stats
-    one_array = np.hstack(arrays.values())
+    one_array = np.hstack(list(arrays.values()))
     median = np.nanmedian(one_array)
-    mad = stats.median_absolute_deviation(one_array, nan_policy='omit', scale=1.4826)
+    mad = stats.median_abs_deviation(one_array, nan_policy='omit', scale='normal')
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], median, mad)
     return arrays
@@ -93,7 +101,7 @@ def Median_norm(arrays):
         outarrays - dictionary of numpy arrays
 
     """
-    one_array = np.hstack(arrays.values())
+    one_array = np.hstack(list(arrays.values()))
     median = np.nanmedian(one_array)
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)

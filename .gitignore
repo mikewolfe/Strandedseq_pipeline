@@ -2,3 +2,4 @@
 resources/
 results/
 workflow/scripts/__pycache__/
+workflow/scripts/*.pyc
