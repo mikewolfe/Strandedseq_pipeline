@@ -7,7 +7,8 @@ reference:
     U00096.3:
         # location of the genbanks. If put in the location and format shown
         # below the pipeline will attempt to pull this file from NCBI by
-        # accession number
+        # accession number. Each genbank MUST have a associated name which
+        # is used to name the contig pulled from it.
         genbanks: 
             U00096.3: resources/genbanks/U00096.3.gbk
         # This is the fasta file for each chromosome in the genome
@@ -15,20 +16,11 @@ reference:
         # from the genbank.
         fastas:
             - results/alignment/process_genbank/U00096.3/U00096.3.fna
+            # but you can also add additional contigs that you may want in
+            # the final alignment genome by listing them here
+            - test/ecoli_rrnD.fa
         masked_regions: test/ecoli_rrns.bed
-    ZM4:
-        genbanks:
-            ZM4: resources/genbanks/CP023715.1.gbk
-            pZM32: resources/genbanks/CP023716.1.gbk
-            pZM33: resources/genbanks/CP023717.1.gbk
-            pZM36: resources/genbanks/CP023718.1.gbk
-            pZM39: resources/genbanks/CP023719.1.gbk
-        fastas:
-            - results/alignment/process_genbank/ZM4/ZM4.fna
-            - results/alignment/process_genbank/ZM4/pZM32.fna
-            - results/alignment/process_genbank/ZM4/pZM33.fna
-            - results/alignment/process_genbank/ZM4/pZM36.fna
-            - results/alignment/process_genbank/ZM4/pZM39.fna
+
 # Options to control genome coverage calculations
 coverage:
     # what resolution in bp do you want the coverage to be calculated?
@@ -66,18 +58,8 @@ peak_calling:
                 # Number of entries to consolidate peaks over i.e. two peaks within
                 # 10 * 5bp = 50 bp will get merged into one peak.
             consolidate: 10
-        ZM4:
-                # Half the size of the window in *entries* thus this would be 25
-                # * 5 bp resolution for a half window size of 125 bp
-            wi: 25
-                # Number of entries to consolidate peaks over i.e. two peaks within
-                # 10 * 5bp = 50 bp will get merged into one peak.
-            consolidate: 10
     macs2:
         group_by: genome
         U00096.3:
             # call broad peaks?
             broad: true
-        ZM4:
-            # call broad peaks?
-            broad: false
