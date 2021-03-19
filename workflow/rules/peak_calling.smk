@@ -106,7 +106,6 @@ rule macs2_call_peaks:
         stdout="results/peak_calling/logs/macs2/{sample}_macs2.log",
         stderr="results/peak_calling/logs/macs2/{sample}_macs2.err"
     params:
-        genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep),
         peak_vals = lambda wildcards: determine_macs2_params(wildcards.sample, config, pep),
         
     conda:
@@ -115,5 +114,5 @@ rule macs2_call_peaks:
         "macs2 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
         "--outdir results/peak_calling/macs2/ "
         "-f BAMPE  {params.peak_vals[broad]} "
-        "-g {params.genome_size} > {log.stdout} 2> {log.stderr}"
+        "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}"
 

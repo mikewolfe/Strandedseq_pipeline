@@ -18,3 +18,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug fixes
 - Fixed an issue when running `coverage_and_norm` module only ([#3](https://github.com/mikewolfe/ChIPseq_pipeline/issues/3))
 - Fixed an issue with the `tbb` version being too high on some systems in the `alignment.yaml` file
+- Fixed an issue where genome size was not properly read as input to Macs2 in `workflow/rules/peak_calling.smk`
