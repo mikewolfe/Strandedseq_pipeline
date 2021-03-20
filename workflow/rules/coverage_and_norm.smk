@@ -72,7 +72,7 @@ rule deeptools_coverage:
     params:
         resolution = RES,
         genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep),
-        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample)
+        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC"
     threads:
@@ -173,6 +173,46 @@ rule bwtools_median:
        "workflow/scripts/bwtools.py "
        "{input} {output} "
        "--res {params.resolution} --operation Median_norm "
+       "> {log.stdout} 2> {log.stderr}"
+
+rule bwtools_background_subtract:
+    input:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
+    output:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio_minbg.bw"
+    params:
+        resolution = RES,
+        bg_regions = config["background_subtraction"]["background_regions"]
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg.log",
+        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py "
+       "{input} {output} "
+       "--res {params.resolution} --operation background_subtract "
+       "--background_regions {params.bg_regions} "
+       "> {log.stdout} 2> {log.stderr}"
+
+rule bwtools_scale_max:
+    input:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio_minbg.bw"
+    output:
+        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio_minbg_scalemax.bw"
+    params:
+        resolution = RES
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg_scalemax.log",
+        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg_scalemax.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py "
+       "{input} {output} "
+       "--res {params.resolution} --operation scale_max "
        "> {log.stdout} 2> {log.stderr}"
 
 rule bwtools_RobustZ:

@@ -106,6 +106,30 @@ def Median_norm(arrays):
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
+
+def background_subtract(arrays, background_regions = None, res = 1):
+    if background_regions:
+        import bed_utils
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(background_regions)
+        background_vals = []
+        for region in inbed:
+            background_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
+        subtract_val = np.nanmean(background_vals)
+        for chrm in arrays.keys():
+            arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
+    return arrays
+
+def scale_max(arrays, num_top, res = 1):
+    one_array = np.hstack(list(arrays.values()))
+    one_array = one_array[np.isfinite(one_array)]
+    ind = np.argpartition(one_array, -num_top//res)[-num_top//res:]
+    scale_factor = np.nanmedian(one_array[ind])
+
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
+    return arrays
+
      
 if __name__ == "__main__":
     import argparse
@@ -118,12 +142,16 @@ if __name__ == "__main__":
     parser.add_argument('--operation', type=str, default=None,
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
-            options {'RobustZ', 'Median_norm'}")
+            options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max'}")
+    parser.add_argument('--background_regions', type=str, default=None,
+            help="bed file containing known regions of background.")
     
     args = parser.parse_args()
     
     operation_dict={"RobustZ": RobustZ_transform, 
-            "Median_norm": Median_norm}
+            "Median_norm": Median_norm,
+            "background_subtract": lambda x: background_subtract(x, args.background_regions, args.res),
+            "scale_max": lambda x: scale_max(x, 1000, args.res)}
 
     # read in file 
     inf = pyBigWig.open(args.infile)
