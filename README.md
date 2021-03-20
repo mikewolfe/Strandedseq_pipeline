@@ -113,6 +113,7 @@ The pipeline is organized into modules each of which runs a specific task needed
 - [workflow/rules/coverage_and_norm.smk](workflow/rules/coverage_and_norm.smk) includes rules for calculating read coverage over the genome and performing within and between sample normalization
 - [workflow/rules/peak_calling.smk](workflow/rules/peak_calling.smk) includes rules for calling ChIP-seq peaks
 - [workflow/rules/quality_control.smk](workflow/rules/quality_control.smk) includes rules for performing summarizing quality control on the reads themselves and ChIP-seq specific quality control
+- [workflow/rules/postprocessing.smk](workflow/rules/postprocessing.smk) includes rules for getting summaries of ChIP signals over specified regions or locations
 
 Each of these rules can be run individually using:
 ```

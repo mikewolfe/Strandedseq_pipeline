@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full support for genomes with multiple contigs/chromosomes ([#5](https://github.com/mikewolfe/ChIPseq_pipeline/issues/5))
 - Full support of masking regions of the genome from analysis ([#11](https://github.com/mikewolfe/ChIPseq_pipeline/issues/11))
 - Full support for normalization based on a known background region ([#6](https://github.com/mikewolfe/ChIPseq_pipeline/issues/6))
+- Calculate summaries over regions or locations ([#14](https://github.com/mikewolfe/ChIPseq_pipeline/issues/14))
 
 ### Changed
 - Config syntax for specifying genome inputs

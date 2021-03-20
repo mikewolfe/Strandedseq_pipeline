@@ -21,6 +21,11 @@ def determine_extracted_samples(pep):
     samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
     return samples.tolist()
 
+def filter_samples(pep, filter_text):
+    samp_table = pep.sample_table
+    samples = samp_table.loc[samp_table.eval(filter_text), "sample_name"]
+    return samples.tolist()
+
 def determine_resolution(config):
     if "coverage" in config and "resolution" in config["coverage"]:
         resolution = config["coverage"]["resolution"]
@@ -105,6 +110,7 @@ include: "workflow/rules/alignment.smk"
 include: "workflow/rules/coverage_and_norm.smk"
 include: "workflow/rules/quality_control.smk"
 include: "workflow/rules/peak_calling.smk"
+include: "workflow/rules/postprocessing.smk"
 
 
 

@@ -55,6 +55,8 @@ rule process_genbank:
     shell:
          "python3 workflow/scripts/parse_genbank.py {input} "
          "--outfmt {wildcards.outfmt} "
+         "--features CDS tRNA rRNA ncRNA "
+         "--qual_name gene "
          "--chrm '{wildcards.contig}'  "
          " > {output} 2> {log.stderr}"
 
