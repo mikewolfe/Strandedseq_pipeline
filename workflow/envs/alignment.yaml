@@ -3,5 +3,6 @@ channels:
     - bioconda
 dependencies:
     - bowtie2=2.4.1
+    - tbb=2020.2
     - samtools=1.10
     - ncbi-acc-download=0.2.6
