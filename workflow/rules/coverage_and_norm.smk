@@ -170,7 +170,7 @@ rule bwtools_median:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
-       "workflow/scripts/bwtools.py "
+       "workflow/scripts/bwtools.py manipulate "
        "{input} {output} "
        "--res {params.resolution} --operation Median_norm "
        "> {log.stdout} 2> {log.stderr}"
@@ -190,7 +190,7 @@ rule bwtools_background_subtract:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
-       "workflow/scripts/bwtools.py "
+       "workflow/scripts/bwtools.py manipulate "
        "{input} {output} "
        "--res {params.resolution} --operation background_subtract "
        "--background_regions {params.bg_regions} "
@@ -210,7 +210,7 @@ rule bwtools_scale_max:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
-       "workflow/scripts/bwtools.py "
+       "workflow/scripts/bwtools.py manipulate "
        "{input} {output} "
        "--res {params.resolution} --operation scale_max "
        "> {log.stdout} 2> {log.stderr}"
@@ -231,7 +231,7 @@ rule bwtools_RobustZ:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
-       "workflow/scripts/bwtools.py "
+       "workflow/scripts/bwtools.py manipulate "
        "{input} {output} "
        "--res {params.resolution} "
        "--operation RobustZ > {log.stdout} 2> {log.stderr}"

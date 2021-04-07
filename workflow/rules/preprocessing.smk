@@ -35,7 +35,7 @@ rule cutadapt_pe:
     shell:
         "cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT "
         "--cores={threads} "
-        "-o {output.out1} -p {output.out2} {input} > {log.stdout} 2> {log.stderr}"
+        "-o {output.out1} -p {output.out2} {input:q} > {log.stdout} 2> {log.stderr}"
 
 rule trimmomatic_pe:
     message: "Running trimmomatic on {wildcards.sample}"
