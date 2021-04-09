@@ -16,6 +16,44 @@ def lookup_sample_metadata(sample, key, pep):
     """
     return pep.sample_table.at[sample, key]
 
+def lookup_in_config(config, keys, default = None):
+    curr_dict = config
+    try:
+        for key in keys:
+            curr_dict = curr_dict[key]
+        value = curr_dict
+    except KeyError:
+        if default is not None:
+            logger.warning("No value found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
+            value = default
+        else:
+            logger.error("No value found for keys: '%s' in config.file"%(",".join(keys)))
+            raise KeyError
+    return value
+
+
+def lookup_in_config_persample(config, pep, keys, sample, default = None):
+    """
+    This is a special case of looking up things in the config file for
+    a given sample. First check for if column is specified. Then
+    check if value is specified
+    """
+    param_info = lookup_in_config(config, keys, default)
+    if type(param_info) is dict:
+        if "column" in param_info.keys():
+            outval = lookup_sample_metadata(sample, param_info["column"], pep)
+        elif "value" in param_info.keys():
+            outval = param_info["value"]
+        else:
+            logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
+            outval = default
+
+    else:
+        logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
+        outval = default
+    return outval
+            
+
 def determine_extracted_samples(pep):
     samp_table = pep.sample_table
     samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
@@ -23,25 +61,10 @@ def determine_extracted_samples(pep):
 
 def filter_samples(pep, filter_text):
     samp_table = pep.sample_table
-    samples = samp_table.loc[samp_table.eval(filter_text), "sample_name"]
+    #samples = samp_table.loc[samp_table.eval(filter_text), "sample_name"] 
+    samples = samp_table.query(filter_text)["sample_name"]
     return samples.tolist()
 
-def determine_resolution(config):
-    if "coverage" in config and "resolution" in config["coverage"]:
-        resolution = config["coverage"]["resolution"]
-    else:
-        logger.warning(
-        """
-        Could not find specification for resolution in config file. I.e.
-
-        coverage:
-            resolution: N
-
-        defaulting to 5 bp resolution
-        """)
-        resolution = 5
-        
-    return resolution
 
 def determine_effective_genome_size_file(sample, config, pep):
     genome = lookup_sample_metadata(sample, "genome", pep)
@@ -60,33 +83,18 @@ def determine_masked_regions_file(config, genome):
         outfile = None
     return outfile
 
-def determine_within_normalization(config):
-    if "normalization" in config and "within" in config["normalization"]:
-        within = config["normalization"]["within"]
-    else:
-        logger.warning(
-        """
-        Could not find specification for normalization within a sample in config file. I.e.
-
-        normalization:
-            within: X
-
-        defaulting to normalization by median signal in bins
-        """)
-        within = "median"
-    return within
 
 def determine_final_normalization(config):
     ending = "log2ratio"
-    if "normalization" in config and "RobustZ" in config["normalization"]:
-        RZ = config["normalization"]["RobustZ"]
+    if "coverage_and_norm" in config and "RobustZ" in config["coverage_and_norm"]:
+        RZ = config["coverage_and_norm"]["RobustZ"]
         if RZ:
             ending += "RZ"
     return ending
 
 def determine_pseudocount(config):
-    if "normalization" in config and "pseudocount" in config["normalization"]:
-        pseudocount = config["normalization"]["pseudocount"]
+    if "coverage_and_norm" in config and "pseudocount" in config["coverage_and_norm"]:
+        pseudocount = config["coverage_and_norm"]["pseudocount"]
     else:
         logger.warning(
         """
@@ -100,8 +108,8 @@ def determine_pseudocount(config):
         pseudocount = 0
     return pseudocount
     
-RES = determine_resolution(config)
-WITHIN = determine_within_normalization(config)
+RES = lookup_in_config(config, ["coverage_and_norm", "resolution"], 5)
+WITHIN = lookup_in_config(config, ["coverage_and_norm", "within"], "median")
 ENDING = determine_final_normalization(config)
 
 # include in several rules here

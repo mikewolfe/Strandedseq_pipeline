@@ -12,7 +12,7 @@ reference:
         genbanks: 
             U00096.3: resources/genbanks/U00096.3.gbk
         # This is the fasta file for each chromosome in the genome
-        # If specified in this location then it is automatically parsed
+        # If specified location then it is automatically parsed
         # from the genbank.
         fastas:
             - results/alignment/process_genbank/U00096.3/U00096.3.fna
@@ -21,13 +21,35 @@ reference:
             - test/ecoli_rrnD.fa
         masked_regions: test/ecoli_rrns.bed
 
+# Options to control preprocessing rules
+preprocessing:
+    cutadapt_pe:
+        cut_param_string:
+            value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+    trimmomatic_pe:
+        trim_param_string:
+            value: "LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15"
+
+# Options to control alignment rules
+alignment:
+    process_genbank:
+        features:
+            value: "CDS tRNA rRNA ncRNA"
+        qual_name: 
+            value: "gene"
+
+    bowtie2_map:
+        bowtie2_param_string:
+            value: "--end-to-end --very-sensitive --phred33"
+        samtools_view_param_string:
+            value: "-b"
+
+
 # Options to control genome coverage calculations
-coverage:
+coverage_and_norm:
+    # general controls
     # what resolution in bp do you want the coverage to be calculated?
     resolution: 5
-
-# Options to control normalization of coverage signals
-normalization:
     # how to normalize within a sample. Options include:
     # RPKM, CPM, BPM, RPGC, median, and SES. See deeptools manual for
     # details on these normalization methods.
@@ -38,6 +60,14 @@ normalization:
     pseudocount: 1
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
+    # rule specific controls
+    deeptools_coverage:
+        bamCoverage_param_string:
+            value: "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10"
+    bwtools_background_subtract:
+        background_regions: 
+            value: "test/ecoli_rrns.bed"
+
 
 # Options to control quality control
 quality_control:
@@ -63,3 +93,8 @@ peak_calling:
         U00096.3:
             # call broad peaks?
             broad: true
+
+postprocessing:
+    bwtools_byregion:
+        all_genes:
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"

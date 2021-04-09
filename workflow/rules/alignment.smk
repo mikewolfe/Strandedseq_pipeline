@@ -49,14 +49,17 @@ rule process_genbank:
     log:
         stdout="results/alignment/logs/process_genbank/{genome}/{contig}_{outfmt}.log",
         stderr="results/alignment/logs/process_genbank/{genome}/{contig}_{outfmt}.err"
+    params:
+        features =  lookup_in_config(config, ["alignment", "process_genbank", "features", "value"], "CDS tRNA rRNA ncRNA"),
+        qual_name = lookup_in_config(config, ["alignment", "process_genbank", "qual_name", "value"], "gene")
     threads: 1
     conda:
         "../envs/alignment.yaml"
     shell:
          "python3 workflow/scripts/parse_genbank.py {input} "
          "--outfmt {wildcards.outfmt} "
-         "--features CDS tRNA rRNA ncRNA "
-         "--qual_name gene "
+         "--features {params.features} "
+         "--qual_name {params.qual_name} "
          "--chrm '{wildcards.contig}'  "
          " > {output} 2> {log.stderr}"
 
@@ -118,7 +121,13 @@ rule bowtie2_map:
     log:
         stderr="results/alignment/logs/bowtie2/{sample}_bt2.log" 
     params:
-        bt2_index= lambda wildcards: get_bt2_index(wildcards.sample,pep)    
+        bt2_index= lambda wildcards: get_bt2_index(wildcards.sample,pep),
+        bowtie2_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["alignment", "bowtie2_map", "bowtie2_param_string"], wildcards.sample,\
+        "--end-to-end --very-sensitive --phred33"),
+        samtools_view_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["alignment", "bowtie2_map", "samtools_view_param_string"],\
+        wildcards.sample, "-b")
     threads: 
         5
     conda:
@@ -126,8 +135,8 @@ rule bowtie2_map:
     shell:
         "bowtie2 -x {params.bt2_index} -p {threads} "
         "-1 {input.in1} -2 {input.in2} --phred33  "
-        "--end-to-end --very-sensitive 2> {log.stderr} "
-        "| samtools view -b > {output}"
+        "{params.bowtie2_param_string} 2> {log.stderr} "
+        "| samtools view {params.samtools_view_param_string} > {output}"
 
 rule bam_sort:
     input:

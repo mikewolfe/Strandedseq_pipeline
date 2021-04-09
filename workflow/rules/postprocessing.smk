@@ -7,24 +7,24 @@ rule clean_postprocessing:
 
 def determine_postprocessing_files(config):
     outfiles = []
-    if "deeptools_byregion" in config["postprocessing"].keys():
+    if lookup_in_config(config, ["postprocessing", "deeptools_byregion"], ""):
         outfiles.extend(
         ["results/postprocessing/deeptools_byregion/%s_deeptools_byregion.tab"%model\
         for model in config["postprocessing"]["deeptools_byregion"]])
 
-    if "deeptools_scaledregion" in config["postprocessing"].keys():
+    if lookup_in_config(config, ["postprocessing", "deeptools_scaledregion"], ""):
         outfiles.extend(
         ["results/postprocessing/deeptools_byregion/%s_deeptools_scaledregion.tab"%model\
         for model in config["postprocessing"]["deeptools_scaledregion"]])
 
 
-    if "deeptools_referencepoint" in config["postprocessing"].keys():
+    if lookup_in_config(config, ["postprocessing", "deeptools_referencepoint"], ""):
         outfiles.extend(
         ["results/postprocessing/deeptools_byregion/%s_deeptools_referencepoint.tab"%model\
         for model in config["postprocessing"]["deeptools_referencepoint"]])
 
 
-    if "bwtools_byregion" in config["postprocessing"].keys():
+    if lookup_in_config(config, ["postprocessing", "bwtools_byregion"], ""):
         outfiles.extend(
         ["results/postprocessing/bwtools_byregion/%s_bwtools_byregion.tab"%model\
         for model in config["postprocessing"]["bwtools_byregion"]])
@@ -39,21 +39,21 @@ rule run_postprocessing:
 
 
 def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
-    these_samples = filter_samples(pep, config["postprocessing"][toolname][modelname]["filter"])
-    files = [config["postprocessing"][toolname][modelname]["filesignature"]%(sample) for sample in these_samples]
+    these_samples = filter_samples(pep, \
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
+    "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio.bw")
+    files = [file_sig%(sample) for sample in these_samples]
     return files
 
 def pull_labels_for_deeptools_models(toolname, modelname, config, pep):
-    these_samples = filter_samples(pep, config["postprocessing"][toolname][modelname]["filter"])
+    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
     return " ".join(these_samples)
-
-def pull_param_for_postprocessing_model(toolname, modelname, param, config):
-    return config["postprocessing"][toolname][modelname][param]
 
 rule deeptools_byregion:
     input:
         inbws= lambda wildcards: pull_bws_for_deeptools_models("deeptools_byregion",wildcards.model,config, pep),
-        inbed= lambda wildcards: pull_param_for_postprocessing_model("deeptools_byregion", wildcards.model, "regions", config)
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_byregion", wildcards.model, "regions"], None)
     output:
         outbinary="results/postprocessing/deeptools_byregion/{model}_deeptools_byregion.npz",
         outtext="results/postprocessing/deeptools_byregion/{model}_deeptools_byregion.tab"
@@ -79,7 +79,7 @@ rule deeptools_byregion:
 rule deeptools_scaledregion:
     input:
         inbws= lambda wildcards: pull_bws_for_deeptools_models("deeptools_scaledregion",wildcards.model,config, pep),
-        inbed= lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "regions", config)
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "regions"], None)
     output:
         outbinary="results/postprocessing/deeptools_scaledregion/{model}_deeptools_scaledregion.npz",
         outtext="results/postprocessing/deeptools_scaledregion/{model}_deeptools_scaledregion.tab"
@@ -88,11 +88,11 @@ rule deeptools_scaledregion:
         stderr="results/postprocessing/logs/deeptools_scaledregion/{model}.err"
     params:
         labels = lambda wildcards: pull_labels_for_deeptools_models("deeptools_scaledregion", wildcards.model, config, pep),
-        upstream = lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "upstream", config),
-        downstream = lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "downstream", config),
-        scaleto = lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "scaleto", config),
-        binsize = lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "binsize", config),
-        binoperation = lambda wildcards: pull_param_for_postprocessing_model("deeptools_scaledregion", wildcards.model, "binoperation", config)
+        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "downstream"], 0),
+        scaleto = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "scaleto"], 1000),
+        binsize = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "binsize"], 5),
+        binoperation = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "binoperation"], "mean")
     threads:
         5
     conda:
@@ -114,7 +114,7 @@ rule deeptools_scaledregion:
 rule deeptools_referencepoint:
     input:
         inbws= lambda wildcards: pull_bws_for_deeptools_models("deeptools_referencepoint",wildcards.model,config, pep),
-        inbed= lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "regions", config)
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_referencepoint", wildcards.model, "regions"], None)
     output:
         outbinary="results/postprocessing/deeptools_referencepoint/{model}_deeptools_referencepoint.npz",
         outtext="results/postprocessing/deeptools_referencepoint/{model}_deeptools_referencepoint.tab"
@@ -122,12 +122,12 @@ rule deeptools_referencepoint:
         stdout="results/postprocessing/logs/deeptools_referencepoint/{model}.log",
         stderr="results/postprocessing/logs/deeptools_referencepoint/{model}.err"
     params:
-        labels = lambda wildcards: pull_labels_for_deeptools_models("deeptools_referencepoint", wildcards.model, config, pep),
-        upstream = lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "upstream", config),
-        downstream = lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "downstream", config),
-        referencepoint = lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "referencepoint", config),
-        binsize = lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "binsize", config),
-        binoperation = lambda wildcards: pull_param_for_postprocessing_model("deeptools_referencepoint", wildcards.model, "binoperation", config)
+        labels = lambda wildcards: pull_labels_for_deeptools_models("postprocessing", "deeptools_scaledregion", wildcards.model, config, pep),
+        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "downstream"], 0),
+        referencepoint = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_referencepoint", wildcards.model, "referencepoint"], "TSS"),
+        binsize = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "binsize"], 5),
+        binoperation = lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_scaledregion", wildcards.model, "binoperation"], "mean")
     threads:
         5
     conda:
@@ -150,7 +150,7 @@ rule deeptools_referencepoint:
 rule bwtools_byregion:
     input:
         inbws= lambda wildcards: pull_bws_for_deeptools_models("bwtools_byregion",wildcards.model,config, pep),
-        inbed= lambda wildcards: pull_param_for_postprocessing_model("bwtools_byregion", wildcards.model, "regions", config)
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "regions"], None)
     output:
         outtext="results/postprocessing/bwtools_byregion/{model}_bwtools_byregion.tab"
     log:
@@ -158,9 +158,9 @@ rule bwtools_byregion:
         stderr="results/postprocessing/logs/bwtools_byregion/{model}.err"
     params:
         labels = lambda wildcards: pull_labels_for_deeptools_models("bwtools_byregion", wildcards.model, config, pep),
-        upstream = lambda wildcards: pull_param_for_postprocessing_model("bwtools_byregion", wildcards.model, "upstream", config),
-        downstream = lambda wildcards: pull_param_for_postprocessing_model("bwtools_byregion", wildcards.model, "downstream", config),
-        res = lambda wildcards: pull_param_for_postprocessing_model("bwtools_byregion", wildcards.model, "res", config),
+        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "downstream"], 0),
+        res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "res"], 5)
     threads:
         5
     conda:

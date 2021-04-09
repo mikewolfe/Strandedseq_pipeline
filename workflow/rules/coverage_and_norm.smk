@@ -45,7 +45,11 @@ rule deeptools_coverage_raw:
         stderr="results/coverage_and_norm/logs/deeptools_coverage/{sample}_raw.err"
     params:
         resolution = RES,
-        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep)
+        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep),
+        bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
+        "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10")
+
     threads:
         5
     conda:
@@ -54,10 +58,9 @@ rule deeptools_coverage_raw:
         "bamCoverage --bam {input.inbam} --outFileName {output} "
         "--outFileFormat 'bigwig' "
         "--numberOfProcessors {threads} --binSize {params.resolution} "
-        "--samFlagInclude 66 --extendReads "
-        "--exactScaling "
         "{params.masked_regions} "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
+        "{params.bamCoverage_param_string} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule deeptools_coverage:
     input:
@@ -72,7 +75,10 @@ rule deeptools_coverage:
     params:
         resolution = RES,
         genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep),
-        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep)
+        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep),
+        bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
+        "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10")
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC"
     threads:
@@ -82,12 +88,11 @@ rule deeptools_coverage:
     shell:
         "bamCoverage --bam {input.inbam} --outFileName {output} --outFileFormat 'bigwig' "
         "--numberOfProcessors {threads} --binSize {params.resolution} "
-        "--samFlagInclude 66 --extendReads "
         "--normalizeUsing {wildcards.norm} "
         "--effectiveGenomeSize {params.genome_size} "
-        "--exactScaling "
         "{params.masked_regions} "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
+        "{params.bamCoverage_param_string} "
+        "> {log.stdout} 2> {log.stderr}"
 
 # helper for finding correct input sample
 def get_log2ratio_matching_input(sample, norm, pep):
@@ -145,16 +150,19 @@ rule deeptools_SES_log2ratio:
     threads:
         5
     params: 
-        resolution = RES
+        resolution = RES,
+        bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
+        "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10")
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
         "bamCompare --bamfile1 {input.ext} --bamfile2 {input.inp} --outFileName {output} "
         "--outFileFormat 'bigwig' --scaleFactorsMethod 'SES' --operation 'log2' "
-        "--extendReads --binSize {params.resolution} --samFlagInclude 66 "
+        "--binSize {params.resolution} "
         "--numberOfProcessors {threads} "
-        "--exactScaling "
-        "--minMappingQuality 10 > {log.stdout} 2> {log.stderr}"
+        "{params.bamCoverage_param_string} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule bwtools_median:
     input:
@@ -177,12 +185,15 @@ rule bwtools_median:
 
 rule bwtools_background_subtract:
     input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
+        infile = "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw",
+        background_regions = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "bwtools_background_subtract", "background_regions"],\
+        wildcards.sample,\
+        "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
         "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio_minbg.bw"
     params:
-        resolution = RES,
-        bg_regions = config["background_subtraction"]["background_regions"]
+        resolution = RES
     log:
         stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg.log",
         stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_log2ratio_minbg.err"
@@ -191,9 +202,9 @@ rule bwtools_background_subtract:
     shell:
        "python3 "
        "workflow/scripts/bwtools.py manipulate "
-       "{input} {output} "
+       "{input.infile} {output} "
        "--res {params.resolution} --operation background_subtract "
-       "--background_regions {params.bg_regions} "
+       "--background_regions {input.background_regions} "
        "> {log.stdout} 2> {log.stderr}"
 
 rule bwtools_scale_max:
