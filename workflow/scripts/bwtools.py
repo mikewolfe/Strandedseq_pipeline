@@ -4,7 +4,7 @@ import pyBigWig
 import numpy as np
 import arraytools
 
-def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1):
+def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandInfs = False):
     """
     Convert a set of arrays for each contig to a bigwig file
     
@@ -22,7 +22,10 @@ def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1):
         for key in chrm_dict.keys():
             this_array = arrays[key]
             # make sure nans don't get added to the bw file
-            the_finite = np.isfinite(this_array)
+            if dropNaNsandInfs:
+                the_finite = np.isfinite(this_array)
+            else:
+                the_finite = np.ones(len(this_array), dtype=bool)
             starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
             ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
             if len(ends) < len(starts):
@@ -150,7 +153,7 @@ def manipulate_main(args):
     arrays = operation_dict[args.operation](arrays)
 
     # write out file
-    write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res)
+    write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     inf.close()
 
 def read_multiple_bws(bw_files, res = 1):
@@ -206,6 +209,52 @@ def query_main(args):
     for fhandle in open_fhandles:
         fhandle.close()
 
+def compare_log2ratio(arrays1, arrays2):
+    out_array = {}
+    for chrm in arrays1.keys():
+        out_array[chrm] = np.log2(arrays1[chrm]) - np.log2(arrays2[chrm])
+    return out_array
+
+def compare_divide(arrays1, arrays2):
+    out_array = {}
+    for chrm in arrays1.keys():
+        out_array[chrm] = arrays1[chrm] / arrays2[chrm]
+    return out_array
+
+def compare_subtract(arrays1, arrays2):
+    out_array = {}
+    for chrm in arrays1.keys():
+        out_array[chrm] = arrays1[chrm] - arrays2[chrm]
+    return out_array
+
+def compare_add(arrays1, arrays2):
+    out_array = {}
+    for chrm in arrays1.keys():
+        out_array[chrm] = arrays1[chrm] + arrays2[chrm]
+    return out_array
+
+def compare_main(args):
+    operation_dict ={"log2ratio": compare_log2ratio,
+            "add": compare_add,
+            "subtract": compare_subtract,
+            "divide": compare_divide}
+    #read in files
+    inf1 = pyBigWig.open(args.infile1)
+    inf2 = pyBigWig.open(args.infile2)
+
+    arrays1 = bigwig_to_arrays(inf1, res = args.res)
+    arrays2 = bigwig_to_arrays(inf2, res = args.res)
+
+    # perform operation
+    arrays_out = operation_dict[args.operation](arrays1, arrays2)
+
+
+    # write out file
+    write_arrays_to_bigwig(args.outfile, arrays_out, inf1.chroms(), \
+            res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+    inf1.close()
+    inf2.close()
+
  
 if __name__ == "__main__":
     import argparse
@@ -226,6 +275,8 @@ if __name__ == "__main__":
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max'}")
     parser_manipulate.add_argument('--background_regions', type=str, default=None,
             help="bed file containing known regions of background.")
+    parser_manipulate.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output bigwig")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 
@@ -241,6 +292,21 @@ if __name__ == "__main__":
     parser_query.add_argument('--downstream', type = int, help = "bp downstream to add")
     parser_query.add_argument('--samp_names', type = str, nargs = "+", help = "sample names for each file")
     parser_query.set_defaults(func=query_main)
+
+    # compare verb
+    parser_compare = subparsers.add_parser("compare", help = "Calculate operations between two BigWig files")
+    parser_compare.add_argument("infile1", type=str, help = "input file 1")
+    parser_compare.add_argument("infile2", type=str, help = "input file 2")
+    parser_compare.add_argument("outfile", type=str, help = "file to output to")
+    parser_compare.add_argument('--res', type=int, default=1,
+            help="Resolution to compute statistics at. Default 1bp. Note this \
+            should be set no lower than the resolution of the input files")
+    parser_compare.add_argument('--operation', type=str, default="log2ratio",
+            help="Default is log2ratio i.e. log2(infile1) - log2(infile2). Other \
+                    options include: add, subtract, divide")
+    parser_compare.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output bigwig")
+    parser_compare.set_defaults(func=compare_main)
     
     args = parser.parse_args()
     args.func(args) 

@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Config syntax for specifying genome inputs
-- Made the pseudocount argument explicit in ratio calculations. Default before was 1.
+- Removed pseudocount specification. Never adds a pseudocount for ratios
+- Added a specification to exclude Infs and NaNs from bigwig files
 - Substantially updated the `bwtools.py` module to enable summary calculations
 - Config syntax for coverage and normalization specification
 
@@ -27,4 +28,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue with the `tbb` version being too high on some systems causing bowtie2 to fail to run (`workflow/envs/alignment.yaml` file).
 - Fixed an issue where genome size was not properly read as input to Macs2 in `workflow/rules/peak_calling.smk`
 - Fixed an issue where filename paths with spaces in them would not input correctly to cutadapt `workflow/rules/preprocessing.smk`
-- Upgraded `numpy` to version 1.20 in peak calling environment to fix issue from incompatibility in `workflow/rules/peak_calling.smk`
+- Upgraded `numpy` to version 1.20 in peak calling environment to fix issue from incompatibility in `workflow/rules/peak_calling.smk` ([#16](https://github.com/mikewolfe/ChIPseq_pipeline/issues/16))

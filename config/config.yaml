@@ -54,10 +54,10 @@ coverage_and_norm:
     # RPKM, CPM, BPM, RPGC, median, and SES. See deeptools manual for
     # details on these normalization methods.
     within: median
-    # add a pseudocount to numerator and denominator in log2ratio
-    # set this to zero if you don't want to add a pseudocount. Note
-    # that bigwigs will not display in IGV if they have nans or infs
-    pseudocount: 1
+    # drop NaNs and Infs from zero coverage in input or extracted
+    # Note
+    # that bigwigs will not display properly in IGV if they have nans or infs
+    dropNaNsandInfs: false
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
     # rule specific controls

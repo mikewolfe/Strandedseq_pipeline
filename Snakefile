@@ -92,6 +92,14 @@ def determine_final_normalization(config):
             ending += "RZ"
     return ending
 
+def determine_dropNaNsandInfs(config):
+    value = lookup_in_config(config, ["coverage_and_norm","dropNaNsandInfs"], True)
+    if value:
+        outstr = "--dropNaNsandInfs"
+    else:
+        outstr = ""
+    return outstr
+
 def determine_pseudocount(config):
     if "coverage_and_norm" in config and "pseudocount" in config["coverage_and_norm"]:
         pseudocount = config["coverage_and_norm"]["pseudocount"]
