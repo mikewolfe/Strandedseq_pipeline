@@ -1,5 +1,4 @@
 module_order:
-    - kallisto
     - fastqc:
         name: 'FastQC (trimmed)'
         anchor: 'fastqc_trimmed'

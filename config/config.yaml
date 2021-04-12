@@ -57,17 +57,29 @@ coverage_and_norm:
     # drop NaNs and Infs from zero coverage in input or extracted
     # Note
     # that bigwigs will not display properly in IGV if they have nans or infs
-    dropNaNsandInfs: false
+    dropNaNsandInfs: true
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
     # rule specific controls
     deeptools_coverage:
         bamCoverage_param_string:
             value: "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10"
+    bwtools_median:
+        pseudocount:
+            value: 1
     bwtools_background_subtract:
         background_regions: 
-            value: "test/ecoli_rrns.bed"
-
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+    bwtools_query_subtract:
+        query_regions:
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+        number_of_regions:
+            value: 20
+    bwtools_query_scale:
+        query_regions:
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+        number_of_regions:
+            value: 20
 
 # Options to control quality control
 quality_control:
@@ -98,3 +110,4 @@ postprocessing:
     bwtools_byregion:
         all_genes:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"

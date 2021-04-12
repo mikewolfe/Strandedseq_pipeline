@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ability to specify parameter strings for certain rules either as a single
   value for every sample or through specifying a column in the metadata sheet
   for by sample control
+- Ability to add pseudocount before within sample normalization. Only implemented for median normalization
+- Support for normalization based on averages over a given set of regions. Enables Occupancy Apparent calculations.
 
 ### Changed
 - Config syntax for specifying genome inputs

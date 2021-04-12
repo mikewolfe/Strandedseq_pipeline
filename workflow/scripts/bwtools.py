@@ -93,7 +93,7 @@ def RobustZ_transform(arrays):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], median, mad)
     return arrays
 
-def Median_norm(arrays):
+def Median_norm(arrays, pseudocount = 0):
     """
     Normalize data by the median value at all contigs
     
@@ -105,24 +105,57 @@ def Median_norm(arrays):
 
     """
     one_array = np.hstack(list(arrays.values()))
+    one_array += pseudocount
     median = np.nanmedian(one_array)
     for chrm in arrays.keys():
-        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
 def background_subtract(arrays, background_regions = None, res = 1):
-    if background_regions:
-        import bed_utils
-        inbed = bed_utils.BedFile()
-        inbed.from_bed_file(background_regions)
-        background_vals = []
-        for region in inbed:
-            background_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
-        background_vals = np.array(background_vals)
-        subtract_val = np.mean(background_vals[np.isfinite(background_vals)])
-        for chrm in arrays.keys():
-            arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
+    import bed_utils
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(background_regions)
+    background_vals = []
+    for region in inbed:
+        background_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
+    background_vals = np.array(background_vals)
+    subtract_val = np.mean(background_vals[np.isfinite(background_vals)])
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
     return arrays
+
+def get_values_per_region(arrays, query_regions, res =1):
+    import bed_utils
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(query_regions)
+    region_averages = []
+    region_names = []
+    for region in inbed:
+        region_vals = arrays[region["chrm"]][region["start"]//res:region["end"]//res]
+        region_average = np.nanmean(region_vals[np.isfinite(region_vals)])
+        region_averages.append(region_average)
+        region_names.append(region["name"])
+    region_averages = np.array(region_averages)
+    region_names = np.array(region_names)
+    finite_vals = np.isfinite(region_averages)
+    return(region_names[finite_vals], region_averages[finite_vals])
+
+def query_subtract(arrays, res = 1, query_regions = None, number_of_regions = None):
+    region_names, region_averages = get_values_per_region(arrays, query_regions, res)
+    region_averages = np.array(region_averages)
+    sort_indices = np.argsort(region_averages)
+    region_names = np.array(region_names)
+    vals = region_averages[sort_indices][:number_of_regions]
+    regions = region_names[sort_indices][:number_of_regions]
+    print("Bottom %s background regions"%number_of_regions)
+    for region,val in zip(regions, vals):
+        print(region + "\t" + "%s"%val)
+    background_val = np.mean(vals)
+    print("Background val: %s"%background_val)
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], background_val, 1)
+    return arrays
+
 
 def scale_max(arrays, num_top, res = 1):
     one_array = np.hstack(list(arrays.values()))
@@ -134,14 +167,32 @@ def scale_max(arrays, num_top, res = 1):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
 
+def scale_region_max(arrays, number_of_regions, query_regions = None, res =1):
+    region_names, region_averages = get_values_per_region(arrays, query_regions, res)
+    region_averages = np.array(region_averages)
+    sort_indices = np.argsort(region_averages)
+    region_names = np.array(region_names)
+    vals = region_averages[sort_indices][-number_of_regions:]
+    regions = region_names[sort_indices][-number_of_regions:]
+    print("Top %s background regions"%number_of_regions)
+    for region,val in zip(regions, vals):
+        print(region + "\t" + "%s"%val)
+    scale_factor = np.mean(vals)
+    print("Max val: %s"%scale_factor)
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
+    return arrays
+
 
 
 def manipulate_main(args):
 
     operation_dict={"RobustZ": RobustZ_transform, 
-            "Median_norm": Median_norm,
+            "Median_norm": lambda x: Median_norm(x, args.pseudocount),
             "background_subtract": lambda x: background_subtract(x, args.background_regions, args.res),
-            "scale_max": lambda x: scale_max(x, 1000, args.res)}
+            "scale_max": lambda x: scale_max(x, 1000, args.res),
+            "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res),
+            "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions)}
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -272,11 +323,19 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--operation', type=str, default=None,
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
-            options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max'}")
+            options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
+            'query_subtract', 'query_scale'}")
     parser_manipulate.add_argument('--background_regions', type=str, default=None,
             help="bed file containing known regions of background.")
+    parser_manipulate.add_argument('--query_regions', type=str, default=None,
+            help="bed file containing regions to consider.")
+    parser_manipulate.add_argument('--number_of_regions', type = int, default = 20,
+            help = "number of regions to include in background or max")
     parser_manipulate.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
+    parser_manipulate.add_argument('--pseudocount', default = 0, type = int,
+            help = "Add value to all unmasked regions before normalization. Only\
+                    applicable to the median normalization. Default = 0 ")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 
