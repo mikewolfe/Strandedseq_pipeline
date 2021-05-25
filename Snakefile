@@ -8,12 +8,14 @@ def samples(pep):
     """
     Get all of the unique sample names
     """
-    return pep.sample_table["sample_name"]
+    return list(pep.sample_table["sample_name"])
 
 def lookup_sample_metadata(sample, key, pep):
     """
     Get sample metadata by key
     """
+    if sample not in pep.sample_table.index:
+        raise KeyError("Sample %s not in sample table"%sample)
     return pep.sample_table.at[sample, key]
 
 def lookup_in_config(config, keys, default = None):

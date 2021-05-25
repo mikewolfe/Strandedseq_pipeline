@@ -54,7 +54,7 @@ rule fastqc_raw:
     conda:
         "../envs/quality_control.yaml"
     shell:
-        "zcat {input} | fastqc stdin:{wildcards.sample}_{wildcards.pair} "
+        "zcat {input:q} | fastqc stdin:{wildcards.sample}_{wildcards.pair} "
         "-o results/quality_control/fastqc_raw > {log.stdout} 2> {log.stderr}"
 
 rule fastqc_processed:

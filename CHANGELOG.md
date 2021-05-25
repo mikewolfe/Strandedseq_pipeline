@@ -16,7 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value for every sample or through specifying a column in the metadata sheet
   for by sample control
 - Ability to add pseudocount before within sample normalization. Only implemented for median normalization
-- Support for normalization based on averages over a given set of regions. Enables Occupancy Apparent calculations.
+- Support for normalization based on averages over a given set of regions.
+  Enables Occupancy Apparent calculations.
+- Support for normalization for occupancy apparent calculations by dynamically
+  determining the highest and lowest N genes by average signal
+- Support for reciprocal ratio calculations to keep ratios in a linear scale.
+  Inverts all ratios less than one and takes negative value. Then subtracts or
+  adds 1 to recenter to zero.
 
 ### Changed
 - Config syntax for specifying genome inputs
@@ -31,3 +37,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where genome size was not properly read as input to Macs2 in `workflow/rules/peak_calling.smk`
 - Fixed an issue where filename paths with spaces in them would not input correctly to cutadapt `workflow/rules/preprocessing.smk`
 - Upgraded `numpy` to version 1.20 in peak calling environment to fix issue from incompatibility in `workflow/rules/peak_calling.smk` ([#16](https://github.com/mikewolfe/ChIPseq_pipeline/issues/16))
+- Fixed an issue where raw fastqs with spaces in the path were not read properly

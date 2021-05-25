@@ -284,11 +284,24 @@ def compare_add(arrays1, arrays2):
         out_array[chrm] = arrays1[chrm] + arrays2[chrm]
     return out_array
 
+def compare_recipratio(arrays1, arrays2):
+    out_array = compare_divide(arrays1, arrays2)
+    for chrm in arrays1.keys():
+        # figure out small values
+        recip_values = out_array[chrm] < 1
+        # take negative reciprocal and add 1
+        out_array[chrm][recip_values] = -1/out_array[chrm][recip_values] + 1
+        # subtract 1 from postive values
+        out_array[chrm][~recip_values] = out_array[chrm][~recip_values] - 1
+
+    return out_array
+
 def compare_main(args):
     operation_dict ={"log2ratio": compare_log2ratio,
             "add": compare_add,
             "subtract": compare_subtract,
-            "divide": compare_divide}
+            "divide": compare_divide,
+            "recipratio": compare_recipratio}
     #read in files
     inf1 = pyBigWig.open(args.infile1)
     inf2 = pyBigWig.open(args.infile2)
@@ -362,7 +375,7 @@ if __name__ == "__main__":
             should be set no lower than the resolution of the input files")
     parser_compare.add_argument('--operation', type=str, default="log2ratio",
             help="Default is log2ratio i.e. log2(infile1) - log2(infile2). Other \
-                    options include: add, subtract, divide")
+                    options include: add, subtract, divide, recipratio (invert ratios less than 1. Center at 0)")
     parser_compare.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
     parser_compare.set_defaults(func=compare_main)
