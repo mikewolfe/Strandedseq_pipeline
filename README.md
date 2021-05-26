@@ -143,7 +143,7 @@ If you run into any issues with the pipeline and would like help please submit i
 
 # Version history
 
-Currently at version 0.0.0
+Currently at version 0.1.0
 
 See the [Changelog](CHANGELOG.md) for version history and upcoming
 features.

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.1.0 - 2021-05-26
 
 ### Added
 - Full support for genomes with multiple contigs/chromosomes ([#5](https://github.com/mikewolfe/ChIPseq_pipeline/issues/5))
@@ -23,13 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for reciprocal ratio calculations to keep ratios in a linear scale.
   Inverts all ratios less than one and takes negative value. Then subtracts or
   adds 1 to recenter to zero.
+- Added a specification to exclude Infs and NaNs from bigwig files
 
 ### Changed
-- Config syntax for specifying genome inputs
-- Removed pseudocount specification. Never adds a pseudocount for ratios
-- Added a specification to exclude Infs and NaNs from bigwig files
+- Config syntax change for specifying genome inputs
+- Removed general pseudocount specification. Never adds a pseudocount for ratios
 - Substantially updated the `bwtools.py` module to enable summary calculations
-- Config syntax for coverage and normalization specification
+- Config syntax change for coverage and normalization specification
 
 ### Bug fixes
 - Fixed an issue when running `coverage_and_norm` module only ([#3](https://github.com/mikewolfe/ChIPseq_pipeline/issues/3))
