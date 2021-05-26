@@ -47,7 +47,8 @@ alignment:
 
 # Options to control genome coverage calculations
 coverage_and_norm:
-    # general controls
+    # general controls - these only control what is automatically run
+    # when running the whole pipeline or module.
     # what resolution in bp do you want the coverage to be calculated?
     resolution: 5
     # how to normalize within a sample. Options include:
@@ -61,23 +62,32 @@ coverage_and_norm:
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
     # rule specific controls
+    # Each of these can be specified either as a single value for every sample
+    # or as a column in the sample_sheet using column: column_name
     deeptools_coverage:
         bamCoverage_param_string:
             value: "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10"
     bwtools_median:
+        # pseudocount is added before normalizing by the median
         pseudocount:
             value: 0
     bwtools_background_subtract:
+        # what regions to use as the background when doing a background
+        # subtraction
         background_regions: 
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
     bwtools_query_subtract:
+        # What regions to consider for a dynamically chosen background subtraction
         query_regions:
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+        # how many regions to look at?
         number_of_regions:
             value: 20
     bwtools_query_scale:
+        # What regions to consider for a max scaling
         query_regions:
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+        # How many regions to look at for max scaling
         number_of_regions:
             value: 20
 
@@ -106,8 +116,44 @@ peak_calling:
             # call broad peaks?
             broad: true
 
+# Control for the postprocessing submodule
 postprocessing:
-    bwtools_byregion:
-        all_genes:
+    # summarizes values by region
+    bwtools_query:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_genes_cov:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+        # Model 2 - look at the coverage for all genes as a mean summary
+        genotypeA_all_genes_mean:
+            # only consider the samples that have a genotype A
+            filter: '"A" in genotype and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            summarize_func: "mean"
+

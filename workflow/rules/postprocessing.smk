@@ -24,10 +24,10 @@ def determine_postprocessing_files(config):
         for model in config["postprocessing"]["deeptools_referencepoint"]])
 
 
-    if lookup_in_config(config, ["postprocessing", "bwtools_byregion"], ""):
+    if lookup_in_config(config, ["postprocessing", "bwtools_query"], ""):
         outfiles.extend(
-        ["results/postprocessing/bwtools_byregion/%s_bwtools_byregion.tab"%model\
-        for model in config["postprocessing"]["bwtools_byregion"]])
+        ["results/postprocessing/bwtools_query/%s_bwtools_query.tab"%model\
+        for model in config["postprocessing"]["bwtools_query"]])
     return outfiles
 
 
@@ -147,20 +147,22 @@ rule deeptools_referencepoint:
         "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr} "
 
 
-rule bwtools_byregion:
+rule bwtools_query:
     input:
-        inbws= lambda wildcards: pull_bws_for_deeptools_models("bwtools_byregion",wildcards.model,config, pep),
-        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "regions"], None)
+        inbws= lambda wildcards: pull_bws_for_deeptools_models("bwtools_query",wildcards.model,config, pep),
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "regions"], None)
     output:
-        outtext="results/postprocessing/bwtools_byregion/{model}_bwtools_byregion.tab"
+        outtext="results/postprocessing/bwtools_query/{model}_bwtools_query.tab"
     log:
-        stdout="results/postprocessing/logs/bwtools_byregion/{model}.log",
-        stderr="results/postprocessing/logs/bwtools_byregion/{model}.err"
+        stdout="results/postprocessing/logs/bwtools_query/{model}.log",
+        stderr="results/postprocessing/logs/bwtools_query/{model}.err"
     params:
-        labels = lambda wildcards: pull_labels_for_deeptools_models("bwtools_byregion", wildcards.model, config, pep),
-        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "upstream"], 0),
-        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "downstream"], 0),
-        res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_byregion", wildcards.model, "res"], 5)
+        labels = lambda wildcards: pull_labels_for_deeptools_models("bwtools_query", wildcards.model, config, pep),
+        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "downstream"], 0),
+        res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "res"], 5),
+        summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summarize"], 'single'),
+        summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean')
     threads:
         5
     conda:
@@ -174,4 +176,6 @@ rule bwtools_byregion:
         "--upstream {params.upstream} "
         "--downstream {params.downstream} "
         "--samp_names {params.labels} "
+        "--summarize {params.summarize} "
+        "--summary_func {params.summary_func} "
         "> {log.stdout} 2> {log.stderr} "

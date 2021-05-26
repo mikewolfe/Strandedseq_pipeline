@@ -214,22 +214,8 @@ def read_multiple_bws(bw_files, res = 1):
         print(fname)
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
     return (all_bws, open_fhandles)
-        
-def query_main(args):
-    import bed_utils
 
-    inbed = bed_utils.BedFile()
-    inbed.from_bed_file(args.regions)
-    res = args.res
-    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
-    
-    if args.samp_names:
-        samp_to_fname = {samp_name : fname for fname, samp_name in zip(args.infiles, args.samp_names)}
-        samp_names = args.samp_names
-    else:
-        samp_to_fname = {fname : fname for fname in args.infiles}
-        samp_names = args.infiles
-    
+def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     coordinates = []
@@ -257,6 +243,67 @@ def query_main(args):
         for i, (region, coord) in enumerate(zip(region_names, coordinates)):
             values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
             outf.write("%s\t%s\t%s\n"%(region, coord, values))
+
+def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean):
+    outvalues = {fname: [] for fname in args.infiles}
+    region_names = []
+    for region in inbed:
+        for fname in args.infiles:
+            these_arrays = all_bws[fname]
+            array_len = len(these_arrays[region["chrm"]])
+            if region["strand"] == "-":
+                left_coord = max(region["start"] - args.downstream, 0)
+                right_coord = min(region["end"] + args.upstream, array_len * res)
+            else:
+                left_coord = max(region["start"] - args.upstream, 0)
+                right_coord = min(region["end"] + args.downstream, array_len * res)
+    
+            these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
+            this_summary = summary_func(these_values)
+            outvalues[fname].append(this_summary)
+        region_names.append(region["name"])
+
+    with open(args.outfile, mode = "w") as outf:
+        header = "region\t%s"%("\t".join(samp_names))
+        outf.write(header + "\n")
+        for i, region in enumerate(region_names):
+            values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+            outf.write("%s\t%s\n"%(region, values))
+
+        
+def query_main(args):
+    import bed_utils
+
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(args.regions)
+    res = args.res
+    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
+    
+    if args.samp_names:
+        samp_to_fname = {samp_name : fname for fname, samp_name in zip(args.infiles, args.samp_names)}
+        samp_names = args.samp_names
+    else:
+        samp_to_fname = {fname : fname for fname in args.infiles}
+        samp_names = args.infiles
+
+    summary_funcs = {'mean' : np.nanmean,
+            'median': np.nanmedian,
+            'max' : np.nanmax,
+            'min' : np.nanmin}
+    try:
+        summary_func = summary_funcs[args.summary_func]
+    except KeyError:
+        KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
+
+    overall_funcs = {'identity' : query_summarize_identity,
+        'single' : lambda x, y, z, a, b: query_summarize_single(x, y, z, a,b, summary_func)}
+    try:
+        overall_func = overall_funcs[args.summarize]
+    except KeyError:
+        KeyError("%s is not a valid option for --summarize"%(args.summarize))
+
+    overall_func(all_bws, samp_names, samp_to_fname, inbed, res)
+    
     for fhandle in open_fhandles:
         fhandle.close()
 
@@ -363,6 +410,10 @@ if __name__ == "__main__":
     parser_query.add_argument('--upstream', type=int, help = "bp upstream to add")
     parser_query.add_argument('--downstream', type = int, help = "bp downstream to add")
     parser_query.add_argument('--samp_names', type = str, nargs = "+", help = "sample names for each file")
+    parser_query.add_argument('--summarize', type = str, help = "How to summarize data. 'identity' reports \
+            each data point. 'single' gives a single number summary. Default = 'identity'", default = 'identity')
+    parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
+            'identity' summary. mean, median, max, min supported. Default = 'mean'", default = "mean")
     parser_query.set_defaults(func=query_main)
 
     # compare verb
