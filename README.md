@@ -7,10 +7,7 @@ aimed at processing ChIP-seq samples with the following
 characteristics:
 
 - Paired-end short-read illumina sequencing data
-- Organisms with a single chromosome
-
-However, support for multiple chromosomes or reference genomes that include additional
-contigs is a high priority development goal.
+- Smaller genome sizes such as bacterial genomes
 
 # What the pipeline does
 Starting from raw fastq files this pipeline does the following:
@@ -27,7 +24,6 @@ In addition this pipeline uses [`multiqc`](https://multiqc.info/) to compile the
 following quality control metrics into an interactive html report:
 - Read QC using [`fastqc`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) both before and after preprocessing
 - A large number of ChIP quality control metrics calculated by [`deeptools`](https://deeptools.readthedocs.io/en/latest/)
-
 
 # Installing the pipeline
 
@@ -117,6 +113,7 @@ The pipeline is organized into modules each of which runs a specific task needed
 - [workflow/rules/coverage_and_norm.smk](workflow/rules/coverage_and_norm.smk) includes rules for calculating read coverage over the genome and performing within and between sample normalization
 - [workflow/rules/peak_calling.smk](workflow/rules/peak_calling.smk) includes rules for calling ChIP-seq peaks
 - [workflow/rules/quality_control.smk](workflow/rules/quality_control.smk) includes rules for performing summarizing quality control on the reads themselves and ChIP-seq specific quality control
+- [workflow/rules/postprocessing.smk](workflow/rules/postprocessing.smk) includes rules for getting summaries of ChIP signals over specified regions or locations
 
 Each of these rules can be run individually using:
 ```
@@ -144,3 +141,9 @@ Many of later modules are dependent on the earlier modules and running a later m
 
 If you run into any issues with the pipeline and would like help please submit it to the Issues page. Please include your `config/config.yaml` file, your `pep/config.yaml` file, your `pep/samples.yaml` file, and the output from `snakemake` that includes your error.
 
+# Version history
+
+Currently at version 0.1.0
+
+See the [Changelog](CHANGELOG.md) for version history and upcoming
+features.

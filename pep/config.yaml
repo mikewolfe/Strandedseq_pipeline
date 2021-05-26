@@ -5,4 +5,3 @@ sample_modifiers:
         attributes: [file_path]
         sources:
             source1: "test/"
-

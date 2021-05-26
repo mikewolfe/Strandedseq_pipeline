@@ -4,6 +4,7 @@ fasta
 Module to read, write, and manipulate fasta files.
 
 """
+import logging
 
 def complement(sequence):
     """Complement a nucleotide sequence
@@ -70,6 +71,29 @@ class FastaEntry(object):
             for key in rm_na.keys():
                 seq = [rm_na[key] if x == key else float(x) for x in seq]
         self.seq = seq
+
+    def mutate(self, start, end, new_seq):
+        """
+        Alter the sequence at a given location
+
+        Args:
+            start (int): A start value for the start of the change
+            end (int): An end value for the end of the change [0, end)
+                       coordinates
+            seq (str): new sequence to put in. Must be same length as original
+                       region
+        Returns:
+            Nothing. self.seq is altered in place
+        """
+
+        if start < 0 or end > len(self):
+            raise ValueError("Region to mutate extends outside of known sequence [%s, %s)"%(start, end))
+        if len(new_seq) != (end - start):
+            raise ValueError("New sequence length (%s) is not the same as region to replace (%s)"%(len(new_seq), len(end-start)))
+        total_size = len(self.seq)
+        self.seq = self.seq[0:start] + new_seq + self.seq[end:total_size]
+
+
 
     def __len__(self):
         if self.length:
@@ -259,8 +283,12 @@ class FastaFile(object):
         Returns:
             None
         """
-        self.data[entry.chrm_name()]= entry
-        self.names.append(entry.chrm_name())
+        chrm_name = entry.chrm_name()
+        if chrm_name not in self.data:
+            self.names.append(chrm_name)
+        else:
+            logging.warning("Entry %s already exists. Overwriting"%(chrm_name))
+        self.data[chrm_name]= entry
 
     def chrm_names(self):
         return self.data.keys()
