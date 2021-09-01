@@ -10,90 +10,61 @@ rule clean_peak_calling:
     shell:
         "rm -fr results/peak_calling"
 
+
+def determine_peak_calling_files(config, pep):
+    outfiles = []
+    for model in lookup_in_config(config, ["peak_calling"], []):
+        peak_caller = lookup_in_config(config, ["peak_calling", model, "peak_caller"], 
+        err = "Need peak caller specified for peak_caller model %s in config file. I.e. \npeak_calling:\n\t%s:\n\t\tpeak_caller: 'macs2'"%(model,model))
+        these_samples = filter_samples(pep, \
+        lookup_in_config(config, ["peak_calling", model, "filter"], "not input_sample.isnull()"))
+        if peak_caller == "macs2":
+            for sample in these_samples:
+                outfiles.append("results/peak_calling/%s/macs2/%s_peaks.xls"%(model, sample))
+        if peak_caller == "cmarrt":
+            for sample in these_samples:
+                outfiles.append("results/peak_calling/%s/cmarrt/%s.narrowPeak"%(model,sample))
+    return outfiles
+
 rule run_peak_calling:
     input:
-        expand("results/peak_calling/cmarrt/{sample}_{within}_{ending}.narrowPeak",\
-        sample = determine_extracted_samples(pep),\
-        within = WITHIN,\
-        ending = ENDING),
-        expand("results/peak_calling/macs2/{sample}_peaks.xls",\
-        sample = determine_extracted_samples(pep))
+        determine_peak_calling_files(config, pep)
 
-# CMARRT helper functions
-def determine_cmarrt_grouping(config):
-    if "peak_calling" in config and \
-       "cmarrt" in config["peak_calling"] and \
-       "group_by" in config["peak_calling"]["cmarrt"]:
-        grouping_category = config["peak_calling"]["cmarrt"]["group_by"]
-    else:
-        grouping_category = "genome"
-    return grouping_category
 
-def determine_cmarrt_params(sample, config, pep):
-    samp_table = pep.sample_table
-    grouping_category = determine_cmarrt_grouping(config)
-    group = lookup_sample_metadata(sample, grouping_category, pep)
-    if "peak_calling" in config and \
-        "cmarrt" in config["peak_calling"] and \
-        group in config["peak_calling"]["cmarrt"]:
-        vals = config["peak_calling"]["cmarrt"][group]
-    else:
-        vals = {}
-    if "wi" not in vals:
-        vals["wi"] = 25
-        logger.warning("CMARRT parameter wi not found for %s %s. Using default of %s"%(grouping_category, group, vals["wi"]))
-    if "consolidate" not in vals:
-        vals["consolidate"] = 10
-        logger.warning("CMARRT parameter consolidate not found for %s %s. Using default of %s"%(grouping_category, group, vals["consolidate"]))    
-    return vals
+def determine_cmarrt_input(sample, model, config, pep):
+   file_sig = lookup_in_config(config, ["peak_calling", model, "filesignature"], 
+   "results/coverage_and_norm/deeptools_log2ratio/%s_BPM_subinp.bw")
+   return file_sig%(sample)
 
 rule cmarrt_call_peaks:
     input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{logratio}.bw"
+        lambda wildcards: determine_cmarrt_input(wildcards.sample, wildcards.model, config, pep)
     output:
-        "results/peak_calling/cmarrt/{sample}_{norm}_{logratio}.narrowPeak"
+        "results/peak_calling/{model}/cmarrt/{sample}.narrowPeak"
     log:
-        stdout="results/peak_calling/logs/cmarrt/{sample}_{norm}_{logratio}_cmarrt.log",
-        stderr="results/peak_calling/logs/cmarrt/{sample}_{norm}_{logratio}_cmarrt.err"
-    wildcard_constraints:
-        norm="RPKM|CPM|BPM|RPGC|count|SES|median"
+        stdout="results/peak_calling/logs/{model}/cmarrt/{sample}_cmarrt.log",
+        stderr="results/peak_calling/logs/{model}/cmarrt/{sample}_cmarrt.err"
     params:
-        peak_vals = lambda wildcards: determine_cmarrt_params(wildcards.sample, config, pep),
-        outpre = lambda wildcards: "results/peak_calling/cmarrt/%s_%s_%s"%(wildcards.sample, wildcards.norm, wildcards.logratio),
+        cmarrt_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["peak_calling", wildcards.model, "cmarrt_param_string"], "--resolution 25 --plots"),
+        window_size = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["peak_calling", wildcards.model, "cmarrt_window_size"], 25),
+        outpre = lambda wildcards: "results/peak_calling/%s/cmarrt/%s"%(wildcards.model, wildcards.sample),
         resolution = RES,
     conda:
         "../envs/peak_calling.yaml"
     shell:
         "python3 "
         "workflow/CMARRT_python/run_cmarrt_bigwig.py "
-        " {input} {params.peak_vals[wi]} "
+        " {input} {params.window_size} "
         "-o {params.outpre} "
         "--resolution {params.resolution} "
-        "--consolidate {params.peak_vals[consolidate]} --plots > {log.stdout} 2> {log.stderr}"
+        "{params.cmarrt_param_string} > {log.stdout} 2> {log.stderr}"
 
 
 def get_macs2_matching_input(sample, pep):
    input_sample = lookup_sample_metadata(sample, "input_sample", pep)
    return "results/alignment/bowtie2/%s_sorted.bam"%(input_sample)
-
-def determine_macs2_params(sample, config, pep):
-    samp_table = pep.sample_table
-    grouping_category = determine_cmarrt_grouping(config)
-    group = lookup_sample_metadata(sample, grouping_category, pep)
-    if "peak_calling" in config and \
-        "macs2" in config["peak_calling"] and \
-        group in config["peak_calling"]["macs2"]:
-        vals = config["peak_calling"]["macs2"][group]
-    else:
-        vals = {}
-    if "broad" not in vals:
-        vals["broad"] = True
-        logger.warning("Macs2 parameter broad not found for %s %s. Using default of %s"%(grouping_category, group, vals["broad"]))
-    if vals["broad"]:
-        vals["broad"] = "--broad"
-    else:
-        vals["broad"] = ""
-    return vals
 
 rule macs2_call_peaks:
     input:
@@ -101,18 +72,19 @@ rule macs2_call_peaks:
         inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep),
         genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
     output:
-        "results/peak_calling/macs2/{sample}_peaks.xls"
+        "results/peak_calling/{model}/macs2/{sample}_peaks.xls"
     log:
-        stdout="results/peak_calling/logs/macs2/{sample}_macs2.log",
-        stderr="results/peak_calling/logs/macs2/{sample}_macs2.err"
+        stdout="results/peak_calling/logs/{model}/macs2/{sample}_macs2.log",
+        stderr="results/peak_calling/logs/{model}/macs2/{sample}_macs2.err"
     params:
-        peak_vals = lambda wildcards: determine_macs2_params(wildcards.sample, config, pep),
-        
+        macs2_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["peak_calling", wildcards.model, "macs2_param_string"], wildcards.sample,\
+        "--broad") 
     conda:
         "../envs/peak_calling.yaml"
     shell:
         "macs2 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
-        "--outdir results/peak_calling/macs2/ "
-        "-f BAMPE  {params.peak_vals[broad]} "
+        "--outdir results/peak_calling/{wildcards.model}/macs2/ "
+        "-f BAMPE  {params.macs2_param_string} "
         "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}"
 
