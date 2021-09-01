@@ -105,7 +105,7 @@ peak_calling:
         # filter out the samples you want to run based on metadata
         filter: 'not input_sample.isnull()'
         # Choose which coverage file you want to run the peak caller on
-        filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_BPM_subinp.bw"
+        filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
         # Window size is required for cmarrt
         # Half the size of the window in *entries* thus this would be 25
         # * 5 bp resolution for a half window size of 125 bp
@@ -139,7 +139,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -157,7 +157,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5

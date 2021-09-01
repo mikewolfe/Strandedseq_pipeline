@@ -33,7 +33,7 @@ rule run_peak_calling:
 
 def determine_cmarrt_input(sample, model, config, pep):
    file_sig = lookup_in_config(config, ["peak_calling", model, "filesignature"], 
-   "results/coverage_and_norm/deeptools_log2ratio/%s_BPM_subinp.bw")
+   "results/coverage_and_norm/bwtools_compare/%s_BPM_subinp.bw")
    return file_sig%(sample)
 
 rule cmarrt_call_peaks:

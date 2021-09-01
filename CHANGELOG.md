@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Refactored the config file syntax to be more general for `peak_calling`
+- Moved output of ext to inp comparisions from `results/coverage_and_norm/deeptools_log2ratio/` to `bwtools_compare/`
 
 ## 0.1.1 - 2021-06-03
 
