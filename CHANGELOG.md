@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Support for subtracting rather than dividing the input from the extracted
+- A summarize method for `bwtools` that gives total signal per contig
 
 ### Changed
 - Refactored the config file syntax to be more general for `peak_calling`

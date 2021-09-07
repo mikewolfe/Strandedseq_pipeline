@@ -307,6 +307,21 @@ def query_main(args):
     for fhandle in open_fhandles:
         fhandle.close()
 
+
+def summarize_main(args):
+
+    res = args.res
+
+    inf1 = pyBigWig.open(args.infile)
+    
+    arrays = bigwig_to_arrays(inf1, res = args.res)
+    with open(args.outfile, mode = "w") as outf:
+        outf.write("contig\tsignal\n")
+        for chrm in arrays.keys():
+            this_array = arrays[chrm]
+            the_finite = np.isfinite(this_array)
+            outf.write("%s\t%s\n"%(chrm, np.sum(this_array[the_finite])))
+
 def compare_log2ratio(arrays1, arrays2):
     out_array = {}
     for chrm in arrays1.keys():
@@ -397,6 +412,17 @@ if __name__ == "__main__":
             help = "Add value to all unmasked regions before normalization. Only\
                     applicable to the median normalization. Default = 0 ")
     parser_manipulate.set_defaults(func=manipulate_main)
+
+
+    # summarize verb
+    parser_summarize = subparsers.add_parser("summarize", help = "Get total signal per contig")
+    parser_summarize.add_argument('infile', type=str, 
+            help="file to convert from")
+    parser_summarize.add_argument('outfile', type=str, help="file to convert to")
+    parser_summarize.add_argument('--res', type=int, default=1,
+            help="Resolution to compute statistics at. Default 1bp. Note this \
+            should be set no lower than the resolution of the input file")
+    parser_summarize.set_defaults(func=summarize_main)
 
 
     # query verb

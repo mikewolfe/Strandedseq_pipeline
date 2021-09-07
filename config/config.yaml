@@ -21,6 +21,29 @@ reference:
             - test/ecoli_rrnD.fa
         masked_regions: test/ecoli_rrns.bed
 
+
+    # name of the genome
+    U00096.3_and_bsub:
+        # location of the genbanks. If put in the location and format shown
+        # below the pipeline will attempt to pull this file from NCBI by
+        # accession number. Each genbank MUST have a associated name which
+        # is used to name the contig pulled from it.
+        genbanks: 
+            U00096.3: resources/genbanks/U00096.3.gbk
+            AL009126.3: resources/genbanks/AL009126.3.gbk
+        # This is the fasta file for each chromosome in the genome
+        # If specified location then it is automatically parsed
+        # from the genbank.
+        fastas:
+            - results/alignment/process_genbank/U00096.3_and_bsub/U00096.3.fna
+            - results/alignment/process_genbank/U00096.3_and_bsub/AL009126.3.fna
+            # but you can also add additional contigs that you may want in
+            # the final alignment genome by listing them here
+            - test/ecoli_rrnD.fa
+        masked_regions: test/ecoli_rrns.bed
+        spike_in:
+            - results/alignment/process_genbank/U00096.3_and_bsub/AL0009126.3.fna
+
 # Options to control preprocessing rules
 preprocessing:
     cutadapt_pe:
