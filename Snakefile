@@ -18,7 +18,7 @@ def lookup_sample_metadata(sample, key, pep):
         raise KeyError("Sample %s not in sample table"%sample)
     return pep.sample_table.at[sample, key]
 
-def lookup_in_config(config, keys, default = None):
+def lookup_in_config(config, keys, default = None, err= None):
     curr_dict = config
     try:
         for key in keys:
@@ -29,12 +29,15 @@ def lookup_in_config(config, keys, default = None):
             logger.warning("No value found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
             value = default
         else:
-            logger.error("No value found for keys: '%s' in config.file"%(",".join(keys)))
+            if err:
+                logger.error(err)
+            else:
+                logger.error("No value found for keys: '%s' in config.file"%(",".join(keys)))
             raise KeyError
     return value
 
 
-def lookup_in_config_persample(config, pep, keys, sample, default = None):
+def lookup_in_config_persample(config, pep, keys, sample, default = None, err = None):
     """
     This is a special case of looking up things in the config file for
     a given sample. First check for if column is specified. Then
@@ -49,10 +52,12 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None):
         else:
             logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
             outval = default
-
     else:
-        logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
-        outval = default
+        if err:
+            logger.error(err)
+        else:
+            logger.err("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
+        raise KeyError
     return outval
             
 
@@ -136,13 +141,9 @@ include: "workflow/rules/postprocessing.smk"
 
 rule run_all:
     input: 
-        "results/quality_control/multiqc_report.html",
-        expand("results/peak_calling/cmarrt/{sample}_{within}_{ending}.narrowPeak",\
-        sample = determine_extracted_samples(pep),\
-        within = WITHIN,\
-        ending = ENDING),
-        expand("results/peak_calling/macs2/{sample}_peaks.xls",\
-        sample = determine_extracted_samples(pep))
+        determine_peak_calling_files(config, pep),
+        determine_postprocessing_files(config)
+
 
 rule clean_all:
     threads: 1

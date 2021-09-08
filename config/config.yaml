@@ -19,13 +19,27 @@ reference:
             # but you can also add additional contigs that you may want in
             # the final alignment genome by listing them here
             - test/ecoli_rrnD.fa
+        # This allows you to mask regions by replacing them with Ns. Masked
+        # regions need to be specified by a bed file
         masked_regions: test/ecoli_rrns.bed
 
 # Options to control preprocessing rules
 preprocessing:
+    # control the parameter string passed to cutadapt. Here you could change
+    # the adaptor sequences for every sample by using 
+    # cut_param_string:
+    #   value: "my string here"
+    # or by sample by using :
+    # cut_param_string: 
+    #   column: cutadapt_params
+    # and specifying the name of the column in the
+    # sample sheet that holds the strings you want to for each sample. In this
+    # example it would be the column cutadapt_params that holds a string for
+    # each sample
     cutadapt_pe:
         cut_param_string:
             value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+    # Control the parameter string from trimmomatic
     trimmomatic_pe:
         trim_param_string:
             value: "LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15"
@@ -33,14 +47,18 @@ preprocessing:
 # Options to control alignment rules
 alignment:
     process_genbank:
+        # Control what features are parsed from the genbank when pulling out
+        # bed files
         features:
             value: "CDS tRNA rRNA ncRNA"
         qual_name: 
             value: "gene"
-
     bowtie2_map:
+        # controls how bowtie2 does its alignments
         bowtie2_param_string:
             value: "--end-to-end --very-sensitive --phred33"
+        # controls samtools filtering as reads come out of bowtie2. Default
+        # is to just convert the sam records into a bam with -b
         samtools_view_param_string:
             value: "-b"
 
@@ -98,23 +116,36 @@ quality_control:
 
 # Options to control peak calling
 peak_calling:
-        # Options that control CMARRT calling
-    cmarrt:
-            # Can specify individual parameters based on a column
-        group_by: genome
-            # for each value in the column specify the parameters
-        U00096.3:
-                # Half the size of the window in *entries* thus this would be 25
-                # * 5 bp resolution for a half window size of 125 bp
-            wi: 25
-                # Number of entries to consolidate peaks over i.e. two peaks within
-                # 10 * 5bp = 50 bp will get merged into one peak.
-            consolidate: 10
-    macs2:
-        group_by: genome
-        U00096.3:
-            # call broad peaks?
-            broad: true
+    # Can make different models to try out different peak callers or parameters
+    cmarrt_all:
+        # specify the peak caller to use. Currently only support "cmarrt" and "macs2"
+        peak_caller: "cmarrt"
+        # filter out the samples you want to run based on metadata
+        filter: 'not input_sample.isnull()'
+        # Choose which coverage file you want to run the peak caller on
+        filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
+        # Window size is required for cmarrt
+        # Half the size of the window in *entries* thus this would be 25
+        # * 5 bp resolution for a half window size of 125 bp
+        cmarrt_window_size:
+            value: 25
+        # Additional parameters to the calling function can be specified here
+        # Number of entries to consolidate peaks over i.e. two peaks within
+        # 10 * 5bp = 50 bp will get merged into one peak.
+        cmarrt_param_string:
+            value:  "--consolidate 10 --plots"
+    macs2_all:
+        peak_caller: "macs2"
+        # filter out the samples you want to run based on metadata
+        filter: 'not input_sample.isnull()'
+        # Macs2 runs directly on the bam files for each sample so
+        # a filesignature does not need to specified.
+
+        # specify a parameter string used to control macs2
+        # -f BAMPE is automatically specified and -g EFFECTIVE_GENOME_SIZE is
+        # automatically determined.
+        macs2_param_string: 
+            value: "--broad"
 
 # Control for the postprocessing submodule
 postprocessing:
@@ -129,7 +160,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -147,7 +178,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
@@ -155,5 +186,6 @@ postprocessing:
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
             summarize_func: "mean"
 

@@ -42,7 +42,7 @@ def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
     these_samples = filter_samples(pep, \
     lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
-    "results/coverage_and_norm/deeptools_log2ratio/%s_median_log2ratio.bw")
+    "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio.bw")
     files = [file_sig%(sample) for sample in these_samples]
     return files
 

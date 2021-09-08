@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0 - 2021-09-08
+
+### Added
+- Support for subtracting rather than dividing the input from the extracted
+- A summarize method for `bwtools` that gives total signal per contig
+
+### Changed
+- Refactored the config file syntax to be more general for `peak_calling`
+- Moved output of ext to inp comparisions from `results/coverage_and_norm/deeptools_log2ratio/` to `bwtools_compare/`
+
 ## 0.1.1 - 2021-06-03
 
 ### Bug Fixes

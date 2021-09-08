@@ -15,7 +15,7 @@ rule clean_coverage_and_norm:
 
 rule run_coverage_and_norm:
     input:       
-        expand("results/coverage_and_norm/deeptools_log2ratio/{sample}_{within}_{ending}.bw",\
+        expand("results/coverage_and_norm/bwtools_compare/{sample}_{within}_{ending}.bw",\
         sample = determine_extracted_samples(pep),\
         within = WITHIN,\
         ending = ENDING)
@@ -74,7 +74,6 @@ rule deeptools_coverage:
         stderr="results/coverage_and_norm/logs/deeptools_coverage/{sample}_{norm}.err"
     params:
         resolution = RES,
-        genome_size = lambda wildcards: determine_effective_genome_size(wildcards.sample, config, pep),
         masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep),
         bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
@@ -89,7 +88,7 @@ rule deeptools_coverage:
         "bamCoverage --bam {input.inbam} --outFileName {output} --outFileFormat 'bigwig' "
         "--numberOfProcessors {threads} --binSize {params.resolution} "
         "--normalizeUsing {wildcards.norm} "
-        "--effectiveGenomeSize {params.genome_size} "
+        "--effectiveGenomeSize $(cat {input.genome_size}) "
         "{params.masked_regions} "
         "{params.bamCoverage_param_string} "
         "> {log.stdout} 2> {log.stderr}"
@@ -133,15 +132,15 @@ rule bwtools_log2ratio:
         ext= "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
         inp= lambda wildcards: get_log2ratio_matching_input(wildcards.sample,wildcards.norm, pep)
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_log2ratio.bw"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|median"
     params: 
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
     log:
-        stdout="results/coverage_and_norm/logs/bwtools_log2ratio/{sample}_{norm}_log2ratio.log",
-        stderr="results/coverage_and_norm/logs/bwtools_log2ratio/{sample}_{norm}_log2ratio.err"
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_log2ratio.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_log2ratio.err"
     threads:
         1
     conda:
@@ -160,15 +159,15 @@ rule bwtools_recipratio:
         ext= "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
         inp= lambda wildcards: get_log2ratio_matching_input(wildcards.sample,wildcards.norm, pep)
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_recipratio.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_recipratio.bw"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|median"
     params: 
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
     log:
-        stdout="results/coverage_and_norm/logs/bwtools_log2ratio/{sample}_{norm}_recipratio.log",
-        stderr="results/coverage_and_norm/logs/bwtools_log2ratio/{sample}_{norm}_recipratio.err"
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_recipratio.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_recipratio.err"
     threads:
         1
     conda:
@@ -198,10 +197,10 @@ rule deeptools_SES_log2ratio:
         inp_ext = lambda wildcards: get_input_bai(wildcards.sample, pep)
 
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_SES_log2ratio.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_SES_log2ratio.bw"
     log:
-        stdout="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_SES_log2ratio.log",
-        stderr="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_SES_log2ratio.err"
+        stdout="results/coverage_and_norm/logs/deeptools_compare/{sample}_SES_log2ratio.log",
+        stderr="results/coverage_and_norm/logs/deeptools_compare/{sample}_SES_log2ratio.err"
     threads:
         5
     params: 
@@ -230,8 +229,8 @@ rule bwtools_median:
         pseudocount = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_median", "pseudocount"], wildcards.sample, 0)
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_median.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_median.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_median.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_median.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -245,22 +244,22 @@ rule bwtools_median:
 
 rule bwtools_background_subtract:
     input:
-        infile = "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}.bw",
+        infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}.bw",
         background_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_background_subtract", "background_regions"],\
         wildcards.sample,\
         "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_minbg.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_minbg.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio"
+        norm_btwn="log2ratio|recipratio|subinp"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_minbg.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_minbg.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -274,18 +273,18 @@ rule bwtools_background_subtract:
 
 rule bwtools_scale_max:
     input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_minbg.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_minbg.bw"
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_minbg_scalemax.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_minbg_scalemax.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_minbg_scalemax.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_minbg_scalemax.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg_scalemax.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg_scalemax.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio"
+        norm_btwn="log2ratio|recipratio|subinp"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -298,13 +297,13 @@ rule bwtools_scale_max:
 
 rule bwtools_query_subtract:
     input:
-        infile="results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}.bw",
+        infile="results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}.bw",
         query_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_query_subtract", "query_regions"],\
         wildcards.sample,\
         "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_querysub.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_querysub.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
@@ -312,11 +311,11 @@ rule bwtools_query_subtract:
         pep, ["coverage_and_norm", "bwtools_query_subtract", "number_of_regions"],\
         wildcards.sample, 20)
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_querysub.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_querysub.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio"
+        norm_btwn="log2ratio|recipratio|subinp"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -332,13 +331,13 @@ rule bwtools_query_subtract:
 
 rule bwtools_query_scale:
     input:
-        infile="results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_querysub.bw",
+        infile="results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_querysub.bw",
         query_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_query_subtract", "query_regions"],\
         wildcards.sample,\
         "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}_querysub_queryscale.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_querysub_queryscale.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
@@ -347,10 +346,10 @@ rule bwtools_query_scale:
         wildcards.sample, 20)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio"
+        norm_btwn="log2ratio|recipratio|subinp"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_querysub_queryscale.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}_querysub_queryscale.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -365,15 +364,15 @@ rule bwtools_query_scale:
 
 rule bwtools_RobustZ:
     input:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}.bw"
     output:
-        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_{norm_btwn}RZ.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}RZ.bw"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}RZ.log",
-        stderr="results/coverage_and_norm/logs/bwtools/{sample}_{norm}_{norm_btwn}RZ.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}RZ.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}RZ.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio"
+        norm_btwn="log2ratio|recipratio|subinp"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
@@ -386,3 +385,29 @@ rule bwtools_RobustZ:
        "--res {params.resolution} "
        "{params.dropNaNsandInfs} "
        "--operation RobustZ > {log.stdout} 2> {log.stderr}"
+
+rule bwtools_subinp:
+    input:
+        ext = "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
+        inp = lambda wildcards: get_log2ratio_matching_input(wildcards.sample, wildcards.norm, pep)
+    output:
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_subinp.bw"
+    wildcard_constraints:
+        norm = "RPKM|CPM|BPM|RPGC|median"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_subinp.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_subinp.err"
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py compare {input.ext} {input.inp} {output} "
+        "--operation 'subtract' "
+        "--res {params.resolution} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
