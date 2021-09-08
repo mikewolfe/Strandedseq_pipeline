@@ -19,36 +19,27 @@ reference:
             # but you can also add additional contigs that you may want in
             # the final alignment genome by listing them here
             - test/ecoli_rrnD.fa
+        # This allows you to mask regions by replacing them with Ns. Masked
+        # regions need to be specified by a bed file
         masked_regions: test/ecoli_rrns.bed
-
-
-    # name of the genome
-    U00096.3_and_bsub:
-        # location of the genbanks. If put in the location and format shown
-        # below the pipeline will attempt to pull this file from NCBI by
-        # accession number. Each genbank MUST have a associated name which
-        # is used to name the contig pulled from it.
-        genbanks: 
-            U00096.3: resources/genbanks/U00096.3.gbk
-            AL009126.3: resources/genbanks/AL009126.3.gbk
-        # This is the fasta file for each chromosome in the genome
-        # If specified location then it is automatically parsed
-        # from the genbank.
-        fastas:
-            - results/alignment/process_genbank/U00096.3_and_bsub/U00096.3.fna
-            - results/alignment/process_genbank/U00096.3_and_bsub/AL009126.3.fna
-            # but you can also add additional contigs that you may want in
-            # the final alignment genome by listing them here
-            - test/ecoli_rrnD.fa
-        masked_regions: test/ecoli_rrns.bed
-        spike_in:
-            - results/alignment/process_genbank/U00096.3_and_bsub/AL0009126.3.fna
 
 # Options to control preprocessing rules
 preprocessing:
+    # control the parameter string passed to cutadapt. Here you could change
+    # the adaptor sequences for every sample by using 
+    # cut_param_string:
+    #   value: "my string here"
+    # or by sample by using :
+    # cut_param_string: 
+    #   column: cutadapt_params
+    # and specifying the name of the column in the
+    # sample sheet that holds the strings you want to for each sample. In this
+    # example it would be the column cutadapt_params that holds a string for
+    # each sample
     cutadapt_pe:
         cut_param_string:
             value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+    # Control the parameter string from trimmomatic
     trimmomatic_pe:
         trim_param_string:
             value: "LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15"
@@ -56,14 +47,18 @@ preprocessing:
 # Options to control alignment rules
 alignment:
     process_genbank:
+        # Control what features are parsed from the genbank when pulling out
+        # bed files
         features:
             value: "CDS tRNA rRNA ncRNA"
         qual_name: 
             value: "gene"
-
     bowtie2_map:
+        # controls how bowtie2 does its alignments
         bowtie2_param_string:
             value: "--end-to-end --very-sensitive --phred33"
+        # controls samtools filtering as reads come out of bowtie2. Default
+        # is to just convert the sam records into a bam with -b
         samtools_view_param_string:
             value: "-b"
 
@@ -143,6 +138,9 @@ peak_calling:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
         filter: 'not input_sample.isnull()'
+        # Macs2 runs directly on the bam files for each sample so
+        # a filesignature does not need to specified.
+
         # specify a parameter string used to control macs2
         # -f BAMPE is automatically specified and -g EFFECTIVE_GENOME_SIZE is
         # automatically determined.
@@ -188,5 +186,6 @@ postprocessing:
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
             summarize_func: "mean"
 
