@@ -242,31 +242,60 @@ rule bwtools_median:
        "{params.dropNaNsandInfs} "
        "> {log.stdout} 2> {log.stderr}"
 
-rule bwtools_background_subtract:
+rule bwtools_fixed_subtract:
     input:
         infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}.bw",
         background_regions = lambda wildcards: lookup_in_config_persample(config,\
-        pep, ["coverage_and_norm", "bwtools_background_subtract", "background_regions"],\
+        pep, ["coverage_and_norm", "bwtools_fixed_subtract", "fixed_regions"],\
         wildcards.sample,\
         "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
-        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_minbg.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio|subinp"
+        norm_btwn="log2ratio|recipratio|subinp|ratio"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg.log",
-        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
        "python3 "
        "workflow/scripts/bwtools.py manipulate "
        "{input.infile} {output} "
-       "--res {params.resolution} --operation background_subtract "
+       "--res {params.resolution} --operation fixed_subtract "
+       "--background_regions {input.background_regions} "
+       "{params.dropNaNsandInfs} "
+       "> {log.stdout} 2> {log.stderr}"
+
+rule bwtools_fixed_scale:
+    input:
+        infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub.bw",
+        background_regions = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "bwtools_fixed_scale", "fixed_regions"],\
+        wildcards.sample,\
+        "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
+    output:
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.bw"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    wildcard_constraints:
+        norm="RPKM|CPM|BPM|RPGC|count|SES|median",
+        norm_btwn="log2ratio|recipratio|subinp|ratio"
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py manipulate "
+       "{input.infile} {output} "
+       "--res {params.resolution} --operation fixed_scale "
        "--background_regions {input.background_regions} "
        "{params.dropNaNsandInfs} "
        "> {log.stdout} 2> {log.stderr}"
@@ -284,7 +313,7 @@ rule bwtools_scale_max:
         stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_minbg_scalemax.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio|subinp"
+        norm_btwn="log2ratio|recipratio|subinp|ratio"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -315,7 +344,7 @@ rule bwtools_query_subtract:
         stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub.err"
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio|subinp"
+        norm_btwn="log2ratio|recipratio|subinp|ratio"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -346,7 +375,7 @@ rule bwtools_query_scale:
         wildcards.sample, 20)
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median",
-        norm_btwn="log2ratio|recipratio|subinp"
+        norm_btwn="log2ratio|recipratio|subinp|ratio"
     log:
         stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.log",
         stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.err"
@@ -408,6 +437,33 @@ rule bwtools_subinp:
         "python3 "
         "workflow/scripts/bwtools.py compare {input.ext} {input.inp} {output} "
         "--operation 'subtract' "
+        "--res {params.resolution} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
+
+
+rule bwtools_ratio:
+    input:
+        ext = "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
+        inp = lambda wildcards: get_log2ratio_matching_input(wildcards.sample, wildcards.norm, pep)
+    output:
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_ratio.bw"
+    wildcard_constraints:
+        norm = "RPKM|CPM|BPM|RPGC|median"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_ratio.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_ratio.err"
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py compare {input.ext} {input.inp} {output} "
+        "--operation 'divide' "
         "--res {params.resolution} "
         "{params.dropNaNsandInfs} "
         "> {log.stdout} 2> {log.stderr}"

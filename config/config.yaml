@@ -89,10 +89,17 @@ coverage_and_norm:
         # pseudocount is added before normalizing by the median
         pseudocount:
             value: 0
-    bwtools_background_subtract:
+    bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
-        # subtraction
-        background_regions: 
+        # subtraction. This just uses all genes which is non-sensical.
+        # You will want to replace with what you need
+        fixed_regions: 
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+    bwtools_fixed_scale:
+        # what regions to use as the background when doing a scaling by a
+        # fixed set of regions. This just uses all genes which is also
+        # non-sensical. You will want to replace with what you need.
+        fixed_regions: 
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
     bwtools_query_subtract:
         # What regions to consider for a dynamically chosen background subtraction
@@ -160,7 +167,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_fixedsub_fixedscale.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -178,7 +185,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
