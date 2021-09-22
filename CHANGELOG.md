@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
+### Added
+- Support for division of the input with no log2 transformation
+- Support for subtract and scaling by a known set of regions
+
 ### Bug fixes
 - Cleaned up multiqc report config file to handle automatic sample name generation. 
   Fixes issue ([#10](https://github.com/mikewolfe/ChIPseq_pipeline/issues/10))

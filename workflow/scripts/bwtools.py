@@ -124,6 +124,19 @@ def background_subtract(arrays, background_regions = None, res = 1):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
     return arrays
 
+def fixed_scale(arrays, regions = None, res = 1):
+    import bed_utils
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(regions)
+    vals = []
+    for region in inbed:
+        vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
+    vals = np.array(background_vals)
+    scale_val = np.mean(background_vals[np.isfinite(background_vals)])
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
+    return arrays
+
 def get_values_per_region(arrays, query_regions, res =1):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -189,7 +202,8 @@ def manipulate_main(args):
 
     operation_dict={"RobustZ": RobustZ_transform, 
             "Median_norm": lambda x: Median_norm(x, args.pseudocount),
-            "background_subtract": lambda x: background_subtract(x, args.background_regions, args.res),
+            "fixed_subtract": lambda x: background_subtract(x, args.fixed_regions, args.res),
+            "fixed_scale" : lambda x : fixed_scale(x, args.fixed_regions, args.res),
             "scale_max": lambda x: scale_max(x, 1000, args.res),
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions)}
@@ -400,8 +414,8 @@ if __name__ == "__main__":
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
             'query_subtract', 'query_scale'}")
-    parser_manipulate.add_argument('--background_regions', type=str, default=None,
-            help="bed file containing known regions of background.")
+    parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
+            help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
             help="bed file containing regions to consider.")
     parser_manipulate.add_argument('--number_of_regions', type = int, default = 20,
