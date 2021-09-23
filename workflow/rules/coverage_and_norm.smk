@@ -245,10 +245,9 @@ rule bwtools_median:
 rule bwtools_fixed_subtract:
     input:
         infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}.bw",
-        background_regions = lambda wildcards: lookup_in_config_persample(config,\
+        fixed_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_fixed_subtract", "fixed_regions"],\
-        wildcards.sample,\
-        "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
+        wildcards.sample)
     output:
         "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub.bw"
     params:
@@ -267,17 +266,16 @@ rule bwtools_fixed_subtract:
        "workflow/scripts/bwtools.py manipulate "
        "{input.infile} {output} "
        "--res {params.resolution} --operation fixed_subtract "
-       "--background_regions {input.background_regions} "
+       "--fixed_regions {input.fixed_regions} "
        "{params.dropNaNsandInfs} "
        "> {log.stdout} 2> {log.stderr}"
 
 rule bwtools_fixed_scale:
     input:
         infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub.bw",
-        background_regions = lambda wildcards: lookup_in_config_persample(config,\
+        fixed_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_fixed_scale", "fixed_regions"],\
-        wildcards.sample,\
-        "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
+        wildcards.sample)
     output:
         "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.bw"
     params:
@@ -296,7 +294,7 @@ rule bwtools_fixed_scale:
        "workflow/scripts/bwtools.py manipulate "
        "{input.infile} {output} "
        "--res {params.resolution} --operation fixed_scale "
-       "--background_regions {input.background_regions} "
+       "--fixed_regions {input.fixed_regions} "
        "{params.dropNaNsandInfs} "
        "> {log.stdout} 2> {log.stderr}"
 

@@ -111,28 +111,28 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
-def background_subtract(arrays, background_regions = None, res = 1):
+def fixed_subtract(arrays, fixed_regions = None, res = 1):
     import bed_utils
     inbed = bed_utils.BedFile()
-    inbed.from_bed_file(background_regions)
-    background_vals = []
+    inbed.from_bed_file(fixed_regions)
+    fixed_vals = []
     for region in inbed:
-        background_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
-    background_vals = np.array(background_vals)
-    subtract_val = np.mean(background_vals[np.isfinite(background_vals)])
+        fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
+    fixed_vals = np.array(fixed_vals)
+    subtract_val = np.mean(fixed_vals[np.isfinite(fixed_vals)])
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
     return arrays
 
-def fixed_scale(arrays, regions = None, res = 1):
+def fixed_scale(arrays, fixed_regions = None, res = 1):
     import bed_utils
     inbed = bed_utils.BedFile()
-    inbed.from_bed_file(regions)
-    vals = []
+    inbed.from_bed_file(fixed_regions)
+    fixed_vals = []
     for region in inbed:
-        vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
-    vals = np.array(background_vals)
-    scale_val = np.mean(background_vals[np.isfinite(background_vals)])
+        fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
+    fixed_vals = np.array(fixed_vals)
+    scale_val = np.mean(fixed_vals[np.isfinite(fixed_vals)])
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
@@ -202,7 +202,7 @@ def manipulate_main(args):
 
     operation_dict={"RobustZ": RobustZ_transform, 
             "Median_norm": lambda x: Median_norm(x, args.pseudocount),
-            "fixed_subtract": lambda x: background_subtract(x, args.fixed_regions, args.res),
+            "fixed_subtract": lambda x: fixed_subtract(x, args.fixed_regions, args.res),
             "fixed_scale" : lambda x : fixed_scale(x, args.fixed_regions, args.res),
             "scale_max": lambda x: scale_max(x, 1000, args.res),
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res),
