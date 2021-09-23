@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Next
+## 0.2.1 - 2021-09-22
 
 ### Added
 - Support for division of the input with no log2 transformation
-- Support for subtract and scaling by a known set of regions
+- Support for subtract and scaling by a known and fixed set of regions
 
 ### Bug fixes
 - Cleaned up multiqc report config file to handle automatic sample name generation. 

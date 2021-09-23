@@ -65,10 +65,11 @@ alignment:
 
 # Options to control genome coverage calculations
 coverage_and_norm:
-    # general controls - these only control what is automatically run
-    # when running the whole pipeline or module.
+
     # what resolution in bp do you want the coverage to be calculated?
     resolution: 5
+    # general controls - these only control what is automatically run
+    # when running the whole pipeline or module.
     # how to normalize within a sample. Options include:
     # RPKM, CPM, BPM, RPGC, median, and SES. See deeptools manual for
     # details on these normalization methods.
