@@ -52,7 +52,7 @@ alignment:
         features:
             value: "CDS tRNA rRNA ncRNA"
         qual_name: 
-            value: "gene"
+            value: "gene locus_tag"
     bowtie2_map:
         # controls how bowtie2 does its alignments
         bowtie2_param_string:

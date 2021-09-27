@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Next
+## 0.2.2 - 2021-09-26
 
 ### Added
 - Support for spike-in based normalization
 - Ability to specify summary function for all region-based normalizations
+- Ability to specify multiple quality fields for genbank parsing to name
+  parsed regions.
 
 ### Bug fixes
 - Fixed bug in error reporting for missing parameters in config file
