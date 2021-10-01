@@ -1,7 +1,7 @@
 def which_samples_to_run(config, pep):
     these_samples = filter_samples(pep,
     lookup_in_config(config, ["variant_calling", "filter"], "input_sample.isnull()"))
-    return ["results/variant_calling/breseq/%s/output/summary.html"%sample for sample in these_samples]
+    return ["results/variant_calling/breseq/renamed_output/%s.vcf"%sample for sample in these_samples]
 
 rule run_variant_calling:
     input:
@@ -70,7 +70,9 @@ rule breseq:
         fastq_R2 = "results/preprocessing/trimmomatic/{sample}_trim_paired_R2.fastq.gz",
         reference_files = lambda wildcards: get_references_per_sample(wildcards.sample, pep)
     output:
-        "results/variant_calling/breseq/{sample}/output/summary.html"
+        "results/variant_calling/breseq/{sample}/output/summary.html",
+        "results/variant_calling/breseq/{sample}/output/output.vcf",
+        "results/variant_calling/breseq/{sample}/output/output.gd"
     threads: 10
     params:
         reference_file_string = lambda wildcards: format_references_per_sample(wildcards.sample, pep)
@@ -84,3 +86,15 @@ rule breseq:
         "-n {wildcards.sample} "
         "-o results/variant_calling/breseq/{wildcards.sample} "
         "-j {threads} > {log.stdout} 2> {log.stderr}"
+
+rule rename_breseq_output:
+    input:
+        vcf="results/variant_calling/breseq/{sample}/output/output.vcf",
+        gd="results/variant_calling/breseq/{sample}/output/output.vcf"
+    output:
+        outvcf="results/variant_calling/breseq/renamed_output/{sample}.vcf",
+        outgd="results/variant_calling/breseq/renamed_output/{sample}.gd"
+
+    threads: 1
+    shell:
+        "cp {input.vcf} {output.outvcf} && cp {input.gd} {output.outgd}"
