@@ -26,8 +26,9 @@ def get_references_per_sample(sample, pep, files = "genbanks_only"):
     For now we will run things assuming you only want to run on
     the genbanks by default
     '''
-    genome = lookup_sample_metadata(sample, "genome", pep)
-    this_genome = lookup_in_config(config, ["reference", genome])
+    ref_name = lookup_in_config_persample(config, pep, ["variant_calling", "reference"],
+    sample, default = lookup_sample_metadata(sample, "genome", pep))
+    this_genome = lookup_in_config(config, ["reference", ref_name])
     all_genbanks = []
     all_fastas = []
     basenames = set()

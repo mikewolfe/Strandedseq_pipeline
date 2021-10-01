@@ -173,6 +173,12 @@ variant_calling:
     # only the input samples as specified by having no sample name in
     # the "input_sample" column
     filter: "input_sample.isnull()"
+    # Which reference to compare against. Reference must be defined above
+    # in the reference section. Can specify a single value for all samples
+    # or a column in the metadata sheet to define a reference for each
+    # sample
+    reference:
+        column: "genome"
 
 
 # Control for the postprocessing submodule
@@ -202,7 +208,7 @@ postprocessing:
         # Model 2 - look at the coverage for all genes as a mean summary
         genotypeA_all_genes_mean:
             # only consider the samples that have a genotype A
-            filter: '"A" in genotype and not input_sample.isnull()'
+            filter: 'genotype == "A" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
