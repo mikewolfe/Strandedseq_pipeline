@@ -167,6 +167,20 @@ peak_calling:
         macs2_param_string: 
             value: "--broad"
 
+# Options to control variant calling. I.e. running breseq on the input samples
+variant_calling:
+    # Which samples do you want to run variant calling on. Typically
+    # only the input samples as specified by having no sample name in
+    # the "input_sample" column
+    filter: "input_sample.isnull()"
+    # Which reference to compare against. Reference must be defined above
+    # in the reference section. Can specify a single value for all samples
+    # or a column in the metadata sheet to define a reference for each
+    # sample
+    reference:
+        column: "genome"
+
+
 # Control for the postprocessing submodule
 postprocessing:
     # summarizes values by region
@@ -194,7 +208,7 @@ postprocessing:
         # Model 2 - look at the coverage for all genes as a mean summary
         genotypeA_all_genes_mean:
             # only consider the samples that have a genotype A
-            filter: '"A" in genotype and not input_sample.isnull()'
+            filter: 'genotype == "A" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -208,4 +222,6 @@ postprocessing:
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
             summarize_func: "mean"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
 
