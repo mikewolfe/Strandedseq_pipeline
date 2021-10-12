@@ -263,7 +263,7 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
             values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
             outf.write("%s\t%s\t%s\n"%(region, coord, values))
 
-def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean):
+def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     for region in inbed:
@@ -278,7 +278,11 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
                 right_coord = min(region["end"] + args.downstream, array_len * res)
     
             these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
-            this_summary = summary_func(these_values)
+            # add a filter for regions that have high amounts of nans
+            if (np.sum(np.isnan(these_values)) / len(these_values)) < frac_na:
+                this_summary = summary_func(these_values)
+            else:
+                this_summary = np.nan
             outvalues[fname].append(this_summary)
         region_names.append(region["name"])
 
@@ -315,7 +319,7 @@ def query_main(args):
         KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
     overall_funcs = {'identity' : query_summarize_identity,
-        'single' : lambda x, y, z, a, b: query_summarize_single(x, y, z, a,b, summary_func)}
+        'single' : lambda x, y, z, a, b: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na)}
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
@@ -461,6 +465,8 @@ if __name__ == "__main__":
     parser_query.add_argument('--samp_names', type = str, nargs = "+", help = "sample names for each file")
     parser_query.add_argument('--summarize', type = str, help = "How to summarize data. 'identity' reports \
             each data point. 'single' gives a single number summary. Default = 'identity'", default = 'identity')
+    parser_query.add_argument('--frac_na', type = float, help = "When reporting summaries for regions, how much of the region\
+            can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
             'identity' summary. mean, median, max, min supported. Default = 'mean'", default = "mean")
     parser_query.set_defaults(func=query_main)

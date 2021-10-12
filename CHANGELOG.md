@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Next
+## 0.2.3 - 2021-10-12
 
 ### Added
 - A `variant_calling` module to call changes from the reference genome with ChIP input samples ([#2](https://github.com/mikewolfe/ChIPseq_pipeline/issues/2))
+- Add option to control what fraction of a region can have NaNs in it and still report a summary value in `bwtools query`
 
 ## 0.2.2 - 2021-09-26
 

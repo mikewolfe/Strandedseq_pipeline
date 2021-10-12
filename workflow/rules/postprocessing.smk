@@ -162,7 +162,8 @@ rule bwtools_query:
         downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "downstream"], 0),
         res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "res"], 5),
         summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summarize"], 'single'),
-        summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean')
+        summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
+        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25)
     threads:
         5
     conda:
@@ -178,4 +179,5 @@ rule bwtools_query:
         "--samp_names {params.labels} "
         "--summarize {params.summarize} "
         "--summary_func {params.summary_func} "
+        "--frac_na {params.frac_na} "
         "> {log.stdout} 2> {log.stderr} "
