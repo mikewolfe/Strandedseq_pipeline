@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.4 - 2021-10-13
+
+### Added
+- Create a compiled html table of all mutations called across all samples in `variant_calling`
+
+### Bug fixes
+- Fixed a bug in renaming `sample/output/output.gd` files to `renamed_output/sample.gd` in `variant_calling`
+
 ## 0.2.3 - 2021-10-12
 
 ### Added
