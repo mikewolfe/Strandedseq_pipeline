@@ -99,3 +99,63 @@ def robustz_1D(array, ignore_nan = True):
         median = np.median(array)
     return normalize_1D(array, median, MAD)
 
+def smooth_1D(array, wsize, kernel_type = "flat", edge = "mirror"):
+    """
+    Function to smooth a 1D signal using a convolution
+
+    Args:
+        array - 1 dimensional numpy array
+        wsize - size of half the window
+        kernel - one of flat, gaussian
+        edge - one of mirror, wrap
+    Returns:
+        outarray - smoothed numpy array of same size
+    """
+    tot_size = wsize*2 + 1
+    if tot_size >= len(array):
+        raise ValueError("Window must be smaller than array. Window %s, array %s"%(tot_size, len(array)))
+
+    if kernel_type == "flat":
+        kernel = np.ones(tot_size)
+    elif kernel_type == "gaussian":
+        x = np.arange(-wsize, wsize + 1)
+        # make the weights span the kernel 
+        sigma = (wsize*2)/6
+        kernel = np.exp(- (x**2)/(2. *sigma**2))
+    else:
+        raise ValueError("kernel_type must be one of flat or gaussian. Not %s"%kernel_type)
+
+    if edge == "mirror":
+        # pad with a mirror reflection of the ends
+        s = np.r_[array[wsize:0:-1], array, array[-2:-wsize-2:-1]]
+    elif edge == "wrap":
+        # pad with a wrap around the horn
+        s = np.r_[array[(-wsize):], array, array[:wsize]]
+    else:
+        raise ValueError("edge must be one of mirror or wrap. Not %s"%edge)
+    kernel = kernel/np.sum(kernel)
+    out = np.convolve(s, kernel, mode = 'valid')
+    return out
+
+def savgol_1D(array, wsize, polyorder=5, deriv=0, delta = 1.0, edge = "mirror"):
+    """
+    Function to smooth a 1D signal using a Savitzky-Golay filter
+
+    Args:
+        array - 1 dimensional numpy array
+        wsize - size of half the window
+        edge - one of mirror, wrap, nearest, constant
+    Returns:
+        outarray - smoothed numpy array of same size
+
+    See also:
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.savgol_filter.html
+    """
+    from scipy import signal
+    tot_size = wsize*2 + 1
+
+    if tot_size >= len(array):
+        raise ValueError("Window must be smaller than array. Window %s, array %s"%(tot_size, len(array)))
+    if polyorder >= tot_size:
+        raise ValueError("polyorder shouldn't be larger than window. Window %s, polyorder %s"%(tot_size, polyorder))
+    return signal.savgol_filter(array, tot_size, polyorder, deriv, delta, mode = edge)
