@@ -1,11 +1,11 @@
 def which_samples_to_run(config, pep):
     these_samples = filter_samples(pep,
     lookup_in_config(config, ["variant_calling", "filter"], "input_sample.isnull()"))
-    return ["results/variant_calling/breseq/renamed_output/%s.vcf"%sample for sample in these_samples]
+    return ["results/variant_calling/breseq/renamed_output/%s.gd"%sample for sample in these_samples]
 
 rule run_variant_calling:
     input:
-        which_samples_to_run(config, pep)
+        "results/variant_calling/breseq/compiled_output.html"
 
 rule clean_variant_calling:
     shell:
@@ -56,8 +56,15 @@ def get_references_per_sample(sample, pep, files = "genbanks_only"):
                 basenames.add(this_basename)
     return all_files
 
-def format_references_per_sample(sample, pep, files = "genbanks_only"):
-    all_files = get_references_per_sample(sample, pep, files)
+def get_all_refs(pep, files = "genbanks_only"): 
+    these_samples = filter_samples(pep,
+    lookup_in_config(config, ["variant_calling", "filter"], "input_sample.isnull()"))
+    out_files = set()
+    for sample in these_samples:
+        [out_files.add(this_file) for this_file in get_references_per_sample(sample, pep, files)]
+    return list(out_files)
+
+def format_references(all_files):
     out_str = ""
     for this_file in all_files:
         out_str += "-r %s "%(this_file)
@@ -75,7 +82,7 @@ rule breseq:
         "results/variant_calling/breseq/{sample}/output/output.gd"
     threads: 10
     params:
-        reference_file_string = lambda wildcards: format_references_per_sample(wildcards.sample, pep)
+        reference_file_string = lambda wildcards: format_references(get_references_per_sample(wildcards.sample, pep))
     log:
         stdout="results/variant_calling/logs/breseq/{sample}.log",
         stderr="results/variant_calling/logs/breseq/{sample}.err"
@@ -90,7 +97,7 @@ rule breseq:
 rule rename_breseq_output:
     input:
         vcf="results/variant_calling/breseq/{sample}/output/output.vcf",
-        gd="results/variant_calling/breseq/{sample}/output/output.vcf"
+        gd="results/variant_calling/breseq/{sample}/output/output.gd"
     output:
         outvcf="results/variant_calling/breseq/renamed_output/{sample}.vcf",
         outgd="results/variant_calling/breseq/renamed_output/{sample}.gd"
@@ -98,3 +105,20 @@ rule rename_breseq_output:
     threads: 1
     shell:
         "cp {input.vcf} {output.outvcf} && cp {input.gd} {output.outgd}"
+
+rule compile_breseq_output_html:
+    input:
+       which_samples_to_run(config, pep)
+    output:
+        "results/variant_calling/breseq/compiled_output.html"
+    conda:
+        "../envs/variant_calling.yaml"
+    params:
+        reference_file_string = format_references(get_all_refs(pep))
+    log:
+        stdout="results/variant_calling/logs/breseq/compiled_html.log",
+        stderr="results/variant_calling/logs/breseq/compiled_html.err"
+    shell:
+        "gdtools ANNOTATE {params.reference_file_string} -f HTML "
+        "-o {output} {input} > {log.stdout} 2> {log.stderr}"
+        
