@@ -147,7 +147,9 @@ If you run into any issues with the pipeline and would like help please submit i
 
 # Version history
 
+
 Currently at version 0.2.4
+
 
 See the [Changelog](CHANGELOG.md) for version history and upcoming
 features.
