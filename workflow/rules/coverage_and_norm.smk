@@ -24,6 +24,17 @@ rule get_raw_coverage:
     input:
         expand("results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw", sample = samples(pep))
 
+def raw_or_smoothed(sample, pep, config):
+    filtered = filter_samples(pep, \
+    lookup_in_config(config, ["coverage_and_norm", "smooth_samples", "filter"], \
+    "not input_sample.isnull() and input_sample.isnull()"))
+    if sample in filtered:
+        out = "results/coverage_and_norm/bwtools_smooth/%s_smooth.bw"%sample
+    else:
+        out = "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"%sample
+    return out
+        
+
 
 def masked_regions_file_for_deeptools(config, sample, pep):
     genome = lookup_sample_metadata(sample, "genome", pep) 
@@ -62,6 +73,34 @@ rule deeptools_coverage_raw:
         "{params.bamCoverage_param_string} "
         "> {log.stdout} 2> {log.stderr}"
 
+rule bwtools_smooth:
+    input:
+        "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw"
+    output:
+        "results/coverage_and_norm/bwtools_smooth/{sample}_smooth.bw"
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_smooth/{sample}_smoothed.log",
+        stderr="results/coverage_and_norm/logs/bwtools_smooth/{sample}_smoothed.err"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config),
+        smooth_params = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "bwtools_smooth", "param_string"], wildcards.sample,\
+        "--operation 'flat_smooth' --wsize 50 --edge 'wrap'")
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py manipulate "
+        "{input} {output} "
+        "--res {params.resolution} "
+        "{params.smooth_params} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
+
+
 rule deeptools_coverage:
     input:
         inbam="results/alignment/bowtie2/{sample}_sorted.bam",
@@ -97,34 +136,6 @@ rule deeptools_coverage:
 def get_log2ratio_matching_input(sample, norm, pep):
    input_sample = lookup_sample_metadata(sample, "input_sample", pep)
    return "results/coverage_and_norm/deeptools_coverage/%s_%s.bw"%(input_sample, norm)
-
-# Old way to get the log2ratio directly using deeptools
-#rule deeptools_log2ratio:
-#    input:
-#        ext= "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
-#        inp= lambda wildcards: get_log2ratio_matching_input(wildcards.sample,wildcards.norm, pep)
-#    output:
-#        "results/coverage_and_norm/deeptools_log2ratio/{sample}_{norm}_log2ratio.bw"
-#    wildcard_constraints:
-#        norm="RPKM|CPM|BPM|RPGC|median"
-#    params: 
-#        resolution = RES,
-#        pseudocount = determine_pseudocount(config)
-#    log:
-#        stdout="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.log",
-#        stderr="results/coverage_and_norm/logs/deeptools_log2ratio/{sample}_{norm}_log2ratio.err"
-#    threads:
-#        5
-#
-#    conda:
-#        "../envs/coverage_and_norm.yaml"
-#    shell:
-#        "bigwigCompare -b1 {input.ext} -b2 {input.inp} --outFileName {output} "
-#        "--operation 'log2' "
-#        "--binSize {params.resolution} "
-#        "--pseudocount {params.pseudocount} "
-#        "--skipZeroOverZero --skipNonCoveredRegions "
-#        "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr}"
 
 
 rule bwtools_log2ratio:
@@ -220,7 +231,7 @@ rule deeptools_SES_log2ratio:
 
 rule bwtools_median:
     input:
-        "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw"
+        lambda wildcards: raw_or_smoothed(wildcards.sample, pep, config)
     output:
         "results/coverage_and_norm/deeptools_coverage/{sample}_median.bw"
     params:
@@ -244,7 +255,7 @@ rule bwtools_median:
 
 rule bwtools_spike_scale:
     input:
-        infile = "results/coverage_and_norm/deeptools_coverage/{sample}_raw.bw",
+        infile = lambda wildcards: raw_or_smoothed(wildcards.sample, pep, config),
         fixed_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_spike_scale", "fixed_regions"],
         wildcards.sample)

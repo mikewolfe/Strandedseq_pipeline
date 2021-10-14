@@ -111,6 +111,43 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
+def smooth(arrays, wsize, kernel_type, edge):
+    """
+    Smooth data using a convolution with a kernel (flat or gaussian).
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        wsize (int) - size of half the window in res (i.e if res is 5 and wsize
+                      is 5 then the wsize in bp is 5*5)
+        kernel_type (str) - "gaussian" or "flat" for the kernel. sd is set to span the window
+        edge (str) - "mirror" or "wrap" for dealing with the edges
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge)
+    return arrays
+
+def savgol(arrays, wsize, polyorder, edge):
+    """
+    Smooth data using a Savtizky-Golay filter
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        wsize (int) - size of half the window in res (i.e if res is 5 and wsize
+                      is 5 then the wsize in bp is 5*5)
+        polyorder (int) - order of polynomial to fit within each window. Can't
+                          be larger than the total window size. 
+                          Higher order smooths less.
+        edge (str) - "mirror" or "wrap" for dealing with the edges
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.savgol_1D(arrays[chrm], wsize, polyorder=polyorder, edge=edge)
+    return arrays
+
+
 def fixed_subtract(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -211,7 +248,10 @@ def manipulate_main(args):
             "scale_max": lambda x: scale_max(x, 1000, args.res),
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
-            "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func])}
+            "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
+            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge),
+            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge)}
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -422,7 +462,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -438,6 +478,17 @@ if __name__ == "__main__":
             help = "For methods that use regions. What summary function do you want to use over \
                     said regions. Options: mean, median, sum \
                     Default = mean ")
+    parser_manipulate.add_argument('--wsize', type = int, help = "For smoothing methods \
+            specifies half the window size in units of res. Thus, a wsize of 5 with \
+            resolution 5 is a 5*5 = 25 bp window. wsize is half the window so \
+            the total window size is wsize*2 + 1")
+    parser_manipulate.add_argument('--edge', default = "mirror", type = str,
+            help = "For smoothing methods how to deal with the edge? 'mirror' takes \
+            half the window on each end and mirrors it. 'wrap' wraps the entire array \
+            around which is ideal for circular chromosomes. Default = 'mirror'"),
+    parser_manipulate.add_argument('--savgol_poly', type = int,
+            help = "For Savtizky-Golay smoothing what order polynomial? Must not \
+            be larger than the full window size.")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 

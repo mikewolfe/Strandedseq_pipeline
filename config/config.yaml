@@ -80,6 +80,10 @@ coverage_and_norm:
     dropNaNsandInfs: true
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
+    # Which samples should be smoothed? Smoothing currently only supported for
+    # spike-in and median normalization. 
+    smooth_samples:
+        filter: 'input_sample.isnull()'
     # rule specific controls
     # Each of these can be specified either as a single value for every sample
     # or as a column in the sample_sheet using column: column_name
@@ -90,6 +94,27 @@ coverage_and_norm:
         # pseudocount is added before normalizing by the median
         pseudocount:
             value: 0
+    #Control the smoothing type and windowsize
+    #Types of smoothing to specify with --operation
+    #   - flat_smooth - convolution with a flat kernel (rolling mean)
+    #   - gauss_smooth - convolution with a gaussian kernel
+    #   - savgol_smooth - use a Savitzky-Golay filter (see
+    #                     https://en.wikipedia.org/wiki/Savitzky%E2%80%93Golay_filter)
+    #For savgol, use --savgol_poly N to control the order of polynomial. A higher
+    #value will do less smoothing. Can't be any higher than the total size of
+    #the window
+    #
+    #Other parameters:
+    # wsize - controls the size of half the window in units of resolution. Thus,
+    #         a wsize of 50 at resolution of 5 bp is a 
+    #         half window size of 50 * 5 = 250
+    #         bp. The total window size is then 250*2 + 1 = 500 bp
+    # edge - controls how to deal with the boundaries of each contig
+    #   'wrap' - wraps the array around the end. Good for circular contigs
+    #   'mirror' - mirrors half the window at the edges.
+    bwtools_smooth:
+        param_string:
+            value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.
@@ -194,7 +219,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_spike_ratio_fixedsub_fixedscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
