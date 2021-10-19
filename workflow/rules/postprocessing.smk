@@ -28,6 +28,9 @@ def determine_postprocessing_files(config):
         outfiles.extend(
         ["results/postprocessing/bwtools_query/%s_bwtools_query.tab"%model\
         for model in config["postprocessing"]["bwtools_query"]])
+        for model in config["postprocessing"]["bwtools_query"]:
+            if config["postprocessing"]["bwtools_query"][model].get("calc_spearman", False):
+                outfiles.append("results/postprocessing/bwtools_query/"+model + "_spearman.tsv")
     return outfiles
 
 
@@ -181,3 +184,19 @@ rule bwtools_query:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "> {log.stdout} 2> {log.stderr} "
+
+rule spearman_per_gene:
+    input:
+        "results/postprocessing/bwtools_query/{model}_bwtools_query.tab"
+    output:
+        "results/postprocessing/bwtools_query/{model}_spearman.tsv"
+    log:
+        stdout="results/postprocessing/logs/spearman_per_gene/{model}.log",
+        stderr = "results/postprocessing/logs/spearman_per_gene/{model}.err"
+    threads:
+        1
+    conda:
+        "../envs/R.yaml"
+    shell:
+        "Rscript workflow/scripts/region_level_spearmans.R {input} {output} > {log.stdout} "
+        "2> {log.stderr}"

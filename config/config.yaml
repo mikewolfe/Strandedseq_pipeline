@@ -83,13 +83,13 @@ coverage_and_norm:
     # Which samples should be smoothed? Smoothing currently only supported for
     # spike-in and median normalization. 
     smooth_samples:
-        filter: 'input_sample.isnull()'
+        filter: 'input_sample.isnull() or not input_sample.isnull()'
     # rule specific controls
     # Each of these can be specified either as a single value for every sample
     # or as a column in the sample_sheet using column: column_name
     deeptools_coverage:
         bamCoverage_param_string:
-            value: "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10"
+            value: "--samFlagInclude 66 --extendReads --exactScaling"
     bwtools_median:
         # pseudocount is added before normalizing by the median
         pseudocount:
@@ -126,7 +126,7 @@ coverage_and_norm:
         # coverage to use as a scaling factor. You could also use mean or
         # median over the regions considered.
         summary_func:
-            value: "sum"
+            value: "mean"
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -230,6 +230,10 @@ postprocessing:
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
+            # Calculate spearman correlations between samples? Only make sense
+            # for summarize "identity". Try to do this on a small number of
+            # samples of the same type
+            calc_spearman: true
         # Model 2 - look at the coverage for all genes as a mean summary
         genotypeA_all_genes_mean:
             # only consider the samples that have a genotype A
