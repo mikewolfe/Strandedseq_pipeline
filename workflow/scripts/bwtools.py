@@ -111,7 +111,7 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
-def smooth(arrays, wsize, kernel_type, edge):
+def smooth(arrays, wsize, kernel_type, edge, sigma = None):
     """
     Smooth data using a convolution with a kernel (flat or gaussian).
 
@@ -125,7 +125,7 @@ def smooth(arrays, wsize, kernel_type, edge):
         outarrays - dictionary of numpy arrays
     """
     for chrm in arrays.keys():
-        arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge)
+        arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge, sigma)
     return arrays
 
 def savgol(arrays, wsize, polyorder, edge):
@@ -249,7 +249,7 @@ def manipulate_main(args):
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
-            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge),
+            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge)}
 
@@ -489,6 +489,9 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--savgol_poly', type = int,
             help = "For Savtizky-Golay smoothing what order polynomial? Must not \
             be larger than the full window size.")
+    parser_manipulate.add_argument('--gauss_sigma', type = int,
+            help = "For gaussian smoothing what is sigma? Must not \
+            be larger than the full window size. Default is wsize*2/6")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 

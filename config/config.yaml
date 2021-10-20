@@ -97,7 +97,8 @@ coverage_and_norm:
     #Control the smoothing type and windowsize
     #Types of smoothing to specify with --operation
     #   - flat_smooth - convolution with a flat kernel (rolling mean)
-    #   - gauss_smooth - convolution with a gaussian kernel
+    #   - gauss_smooth - convolution with a gaussian kernel.
+    #       use --gauss_sigma to control the width of the gaussian.
     #   - savgol_smooth - use a Savitzky-Golay filter (see
     #                     https://en.wikipedia.org/wiki/Savitzky%E2%80%93Golay_filter)
     #For savgol, use --savgol_poly N to control the order of polynomial. A higher
