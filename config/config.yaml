@@ -251,7 +251,7 @@ postprocessing:
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summarize_func: "mean"
+            summary_func: "RPP"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 

@@ -311,6 +311,9 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
                 line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
                 outf.write(line)
 
+def relative_polymerase_progression(array):
+    return arraytools.weighted_center(array, only_finite = True, normalize = True) 
+
 def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
@@ -328,7 +331,10 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
             these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
             # add a filter for regions that have high amounts of nans
             if (np.sum(np.isnan(these_values)) / len(these_values)) < frac_na:
-                this_summary = summary_func(these_values)
+                if region["strand"] == "-":
+                    this_summary = summary_func(these_values[::-1])
+                else:
+                    this_summary = summary_func(these_values)
             else:
                 this_summary = np.nan
             outvalues[fname].append(this_summary)
@@ -371,7 +377,8 @@ def query_main(args):
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
-            'min' : np.nanmin}
+            'min' : np.nanmin,
+            'RPP' : relative_polymerase_progression}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:

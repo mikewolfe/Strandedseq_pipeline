@@ -183,7 +183,7 @@ rule bwtools_query:
         "--summarize {params.summarize} "
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
-        "--gzip"
+        "--gzip "
         "> {log.stdout} 2> {log.stderr} "
 
 rule spearman_per_gene:

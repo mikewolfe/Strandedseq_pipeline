@@ -164,3 +164,25 @@ def savgol_1D(array, wsize, polyorder=5, deriv=0, delta = 1.0, edge = "mirror"):
     if polyorder >= tot_size:
         raise ValueError("polyorder shouldn't be larger than window. Window %s, polyorder %s"%(tot_size, polyorder))
     return signal.savgol_filter(array, tot_size, polyorder, deriv, delta, mode = edge)
+
+def weighted_center(array, only_finite = True, normalize = False):
+    """
+    Find the weighted center of a 1D array
+
+    Args:
+        array - 1 dimensional numpy array
+        only_finite - subset the array to only include finite data points?
+        normalize - divide by 1 to give a relative center?
+    """
+    if only_finite:
+        finite = np.isfinite(array)
+    else:
+        finite = np.ones(array.shape(), dtype = "bool")
+    locs = np.arange(len(array))
+    weighted_mean = (locs[finite] * array[finite]).sum() / array[finite].sum()
+
+    if normalize:
+        return weighted_mean / len(array)
+    else:
+        return weighted_mean
+    

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Next
 
 ## Added
+- Added relative polymerase progression calculation to `bwtools_query` (http://dx.doi.org/10.1016/j.molcel.2014.02.005)
 - Add the ability to smooth raw signals using convolution with a Gaussian or flat kernel. 
 - Add the ability to smooth raw signals using a Savitzky-Golay filter
 - Ability to calculate the region-level spearman correlations for a set of samples in `bwtools_query`
