@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add the ability to smooth raw signals using a Savitzky-Golay filter
 - Ability to calculate the region-level spearman correlations for a set of samples in `bwtools_query`
 
+### Changed
+- Output of `bwtools_query` is now compressed (gzip). File extension changed to `.tsv.gz`
+
 ## 0.2.4 - 2021-10-13
 
 ### Added

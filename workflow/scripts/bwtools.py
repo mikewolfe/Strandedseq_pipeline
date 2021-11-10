@@ -274,7 +274,7 @@ def read_multiple_bws(bw_files, res = 1):
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
     return (all_bws, open_fhandles)
 
-def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
+def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     coordinates = []
@@ -296,14 +296,22 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
         coordinates.extend(these_coordinates)
         region_names.extend([region["name"]]*len(these_coordinates))
 
-    with open(args.outfile, mode = "w") as outf:
-        header = "region\tcoord\t%s"%("\t".join(samp_names))
-        outf.write(header + "\n")
-        for i, (region, coord) in enumerate(zip(region_names, coordinates)):
-            values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
-            outf.write("%s\t%s\t%s\n"%(region, coord, values))
+    header = "region\tcoord\t%s"%("\t".join(samp_names)) + "\n"
+    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    if gzip:
+        with gzip.open(args.outfile, mode = "wb") as outf:
+            outf.write(header.encode())
+            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
+                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+                outf.write(line.encode())
+    else:
+        with open(args.outfile, mode = "w") as outf:
+            outf.write(header)
+            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
+                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+                outf.write(line)
 
-def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25):
+def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     for region in inbed:
@@ -326,12 +334,21 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
             outvalues[fname].append(this_summary)
         region_names.append(region["name"])
 
-    with open(args.outfile, mode = "w") as outf:
-        header = "region\t%s"%("\t".join(samp_names))
-        outf.write(header + "\n")
-        for i, region in enumerate(region_names):
-            values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
-            outf.write("%s\t%s\n"%(region, values))
+    header = "region\t%s"%("\t".join(samp_names)) + "\n"
+    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    if gzip:
+        with gzip.open(args.outfile, mode = "wb") as outf:
+            outf.write(header.encode())
+            for i, region in enumerate(region_names):
+                line = "%s\t%s\n"%(region, values_func(i))
+                outf.write(line.encode())
+    else:
+
+        with open(args.outfile, mode = "w") as outf:
+            outf.write(header)
+            for i, region in enumerate(region_names):
+                line = "%s\t%s\n"%(region, values_func(i))
+                outf.write(line)
 
         
 def query_main(args):
@@ -341,6 +358,8 @@ def query_main(args):
     inbed.from_bed_file(args.regions)
     res = args.res
     all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
+    if args.gzip:
+        import gzip
     
     if args.samp_names:
         samp_to_fname = {samp_name : fname for fname, samp_name in zip(args.infiles, args.samp_names)}
@@ -359,13 +378,13 @@ def query_main(args):
         KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
     overall_funcs = {'identity' : query_summarize_identity,
-        'single' : lambda x, y, z, a, b: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na)}
+        'single' : lambda x, y, z, a, b, c: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na, c)}
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
         KeyError("%s is not a valid option for --summarize"%(args.summarize))
 
-    overall_func(all_bws, samp_names, samp_to_fname, inbed, res)
+    overall_func(all_bws, samp_names, samp_to_fname, inbed, res, gzip)
     
     for fhandle in open_fhandles:
         fhandle.close()
@@ -523,6 +542,7 @@ if __name__ == "__main__":
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
             'identity' summary. mean, median, max, min supported. Default = 'mean'", default = "mean")
+    parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.set_defaults(func=query_main)
 
     # compare verb
