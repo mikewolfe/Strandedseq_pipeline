@@ -185,4 +185,28 @@ def weighted_center(array, only_finite = True, normalize = False):
         return weighted_mean / len(array)
     else:
         return weighted_mean
+
+def relative_summit_loc(array, wsize = 50):
+    smoothed = smooth_1D(array, wsize, kernel_type = "gaussian", edge = "mirror")
+    peak = np.nanargmax(smoothed)
+    return peak
+
+def traveling_ratio(array, wsize = 50, length_cutoff = 1000):
+    # shouldn't do this with anything less than 1000 bp
+    if len(array) < length_cutoff:
+        return np.nan
+    peak = relative_summit_loc(array, wsize)
+    # peak should at the very least be in the first half of the region
+    if peak >= len(array) / 2:
+        return np.nan
+    peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
     
+    # center should be far enough away that windows don't overlap
+    center = int((len(array) + peak)/2)
+    if center - wsize < peak + wsize:
+        return np.nan
+
+    center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
+
+    out = peak_avg/center_avg
+    return out    

@@ -314,6 +314,13 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
+def traveling_ratio(array, res, wsize, maxsize):
+    return arraytools.traveling_ratio(array, wsize = wsize//res, length_cutoff = maxsize//res)
+
+def summit_loc(array, res, wsize, upstream):
+    loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
+    return loc*res - upstream
+
 def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
@@ -378,7 +385,9 @@ def query_main(args):
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
-            'RPP' : relative_polymerase_progression}
+            'RPP' : relative_polymerase_progression,
+            'TR' : lambda array: traveling_ratio(array, args.res, 50, 1000),
+            'summit_loc': lambda array: summit_loc(array, args.res, 50, args.upstream)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
@@ -548,7 +557,8 @@ if __name__ == "__main__":
     parser_query.add_argument('--frac_na', type = float, help = "When reporting summaries for regions, how much of the region\
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
-            'identity' summary. mean, median, max, min supported. Default = 'mean'", default = "mean")
+            'identity' summary. mean, median, max, min supported. Additionally, traveling ratio (TR) and relative polymerase progression (RP) are \
+            supported. Default = 'mean'", default = "mean")
     parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.set_defaults(func=query_main)
 
