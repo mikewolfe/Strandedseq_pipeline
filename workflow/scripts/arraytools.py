@@ -208,5 +208,5 @@ def traveling_ratio(array, wsize = 50, length_cutoff = 1000):
 
     center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
 
-    out = peak_avg/center_avg
+    out = center_avg/peak_avg
     return out    
