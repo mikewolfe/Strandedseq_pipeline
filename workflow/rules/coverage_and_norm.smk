@@ -316,12 +316,12 @@ rule bwtools_fixed_subtract:
 
 rule bwtools_fixed_scale:
     input:
-        infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub.bw",
+        infile = "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}.bw",
         fixed_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_fixed_scale", "fixed_regions"],\
         wildcards.sample)
     output:
-        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_fixedscale.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
@@ -330,10 +330,11 @@ rule bwtools_fixed_scale:
         wildcards.sample, "mean")
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median|spike",
-        norm_btwn="log2ratio|recipratio|subinp|ratio"
+        norm_btwn="log2ratio|recipratio|subinp|ratio",
+        bckgrd_sub = "fixedsub|querysub"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.log",
-        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_fixedsub_fixedscale.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_fixedscale.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_fixedscale.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -410,13 +411,13 @@ rule bwtools_query_subtract:
 
 rule bwtools_query_scale:
     input:
-        infile="results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_querysub.bw",
+        infile="results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}.bw",
         query_regions = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "bwtools_query_scale", "query_regions"],\
         wildcards.sample,\
         "results/alignment/process_genbank/{genome}/{genome}.bed".format(genome = lookup_sample_metadata(wildcards.sample, "genome", pep)))
     output:
-        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_querysub_queryscale.bw"
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_queryscale.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
@@ -428,10 +429,11 @@ rule bwtools_query_scale:
         wildcards.sample, "mean")
     wildcard_constraints:
         norm="RPKM|CPM|BPM|RPGC|count|SES|median|spike",
-        norm_btwn="log2ratio|recipratio|subinp|ratio"
+        norm_btwn="log2ratio|recipratio|subinp|ratio",
+        bckgrd_sub="querysub|fixedsub"
     log:
-        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.log",
-        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_querysub_queryscale.err"
+        stdout="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_queryscale.log",
+        stderr="results/coverage_and_norm/logs/bwtools_manipulate/{sample}_{norm}_{norm_btwn}_{bckgrd_sub}_queryscale.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
