@@ -25,7 +25,10 @@ reference:
 
 # Options to control preprocessing rules
 preprocessing:
-    # control the parameter string passed to cutadapt. Here you could change
+    # GENERAL PARADIGM FOR CONTROLLING THINGS FOR ALL SAMPLES OR SPECIFICALLY
+    # FOR EACH SAMPLE INDIVIDUALLY
+    # Example: 
+    # Control the parameter string passed to cutadapt. Here you could change
     # the adaptor sequences for every sample by using 
     # cut_param_string:
     #   value: "my string here"
@@ -35,7 +38,10 @@ preprocessing:
     # and specifying the name of the column in the
     # sample sheet that holds the strings you want to for each sample. In this
     # example it would be the column cutadapt_params that holds a string for
-    # each sample
+    # each sample.
+    #
+    # This same paradigm is used for all option that have a value or column
+    # specifier
     cutadapt_pe:
         cut_param_string:
             value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
@@ -80,16 +86,45 @@ coverage_and_norm:
     dropNaNsandInfs: true
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
+    # Which samples should be smoothed? Smoothing currently only supported for
+    # spike-in and median normalization. This smooths everything.
+    # If only want inputs smoothed ('input_sample.isnull()').
+    # If want nothing smoothed ('input_sample.isnull() and not
+    # input_sample.isnull()')
+    smooth_samples:
+        filter: 'input_sample.isnull() or not input_sample.isnull()'
     # rule specific controls
     # Each of these can be specified either as a single value for every sample
     # or as a column in the sample_sheet using column: column_name
     deeptools_coverage:
         bamCoverage_param_string:
-            value: "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10"
+            value: "--samFlagInclude 66 --extendReads --exactScaling"
     bwtools_median:
         # pseudocount is added before normalizing by the median
         pseudocount:
             value: 0
+    #Control the smoothing type and windowsize
+    #Types of smoothing to specify with --operation
+    #   - flat_smooth - convolution with a flat kernel (rolling mean)
+    #   - gauss_smooth - convolution with a gaussian kernel.
+    #       use --gauss_sigma to control the width of the gaussian.
+    #   - savgol_smooth - use a Savitzky-Golay filter (see
+    #                     https://en.wikipedia.org/wiki/Savitzky%E2%80%93Golay_filter)
+    #For savgol, use --savgol_poly N to control the order of polynomial. A higher
+    #value will do less smoothing. Can't be any higher than the total size of
+    #the window
+    #
+    #Other parameters:
+    # wsize - controls the size of half the window in units of resolution. Thus,
+    #         a wsize of 50 at resolution of 5 bp is a 
+    #         half window size of 50 * 5 = 250
+    #         bp. The total window size is then 250*2 + 1 = 500 bp
+    # edge - controls how to deal with the boundaries of each contig
+    #   'wrap' - wraps the array around the end. Good for circular contigs
+    #   'mirror' - mirrors half the window at the edges.
+    bwtools_smooth:
+        param_string:
+            value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.
@@ -101,7 +136,7 @@ coverage_and_norm:
         # coverage to use as a scaling factor. You could also use mean or
         # median over the regions considered.
         summary_func:
-            value: "sum"
+            value: "mean"
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -194,7 +229,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_spike_ratio_fixedsub_fixedscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -205,9 +240,36 @@ postprocessing:
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
+            # Calculate spearman correlations between samples? Only make sense
+            # for summarize "identity". Try to do this on a small number of
+            # samples of the same type
+            calc_spearman: true
         # Model 2 - look at the coverage for all genes as a mean summary
-        genotypeA_all_genes_mean:
-            # only consider the samples that have a genotype A
+        all_genes_mean:
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "mean"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 3 - look at the relative polymerase progression for samples in
+        # genotype A
+        genotypeA_all_genes_RPP:
+            # only consider the samples that have a genotype A. Ensure that they
+            # have an associated input sample so that the input samples
+            # themselves are not run.
             filter: 'genotype == "A" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
@@ -221,7 +283,52 @@ postprocessing:
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summarize_func: "mean"
+            summary_func: "RPP"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+        
+        # Model 4 - look at the traveling ratio for samples in genotype A
+        genotypeA_all_genes_TR:
+            # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 5 - look at the identified beta peak locations for the traveling
+        # ratio
+        genotypeA_all_genes_TR:
+            # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 

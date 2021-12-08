@@ -26,8 +26,11 @@ def determine_postprocessing_files(config):
 
     if lookup_in_config(config, ["postprocessing", "bwtools_query"], ""):
         outfiles.extend(
-        ["results/postprocessing/bwtools_query/%s_bwtools_query.tab"%model\
+        ["results/postprocessing/bwtools_query/%s_bwtools_query.tsv.gz"%model\
         for model in config["postprocessing"]["bwtools_query"]])
+        for model in config["postprocessing"]["bwtools_query"]:
+            if config["postprocessing"]["bwtools_query"][model].get("calc_spearman", False):
+                outfiles.append("results/postprocessing/bwtools_query/"+model + "_spearman.tsv")
     return outfiles
 
 
@@ -152,7 +155,7 @@ rule bwtools_query:
         inbws= lambda wildcards: pull_bws_for_deeptools_models("bwtools_query",wildcards.model,config, pep),
         inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "regions"], None)
     output:
-        outtext="results/postprocessing/bwtools_query/{model}_bwtools_query.tab"
+        outtext="results/postprocessing/bwtools_query/{model}_bwtools_query.tsv.gz"
     log:
         stdout="results/postprocessing/logs/bwtools_query/{model}.log",
         stderr="results/postprocessing/logs/bwtools_query/{model}.err"
@@ -180,4 +183,21 @@ rule bwtools_query:
         "--summarize {params.summarize} "
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
+        "--gzip "
         "> {log.stdout} 2> {log.stderr} "
+
+rule spearman_per_gene:
+    input:
+        "results/postprocessing/bwtools_query/{model}_bwtools_query.tsv.gz"
+    output:
+        "results/postprocessing/bwtools_query/{model}_spearman.tsv"
+    log:
+        stdout="results/postprocessing/logs/spearman_per_gene/{model}.log",
+        stderr = "results/postprocessing/logs/spearman_per_gene/{model}.err"
+    threads:
+        1
+    conda:
+        "../envs/R.yaml"
+    shell:
+        "Rscript workflow/scripts/region_level_spearmans.R {input} {output} > {log.stdout} "
+        "2> {log.stderr}"

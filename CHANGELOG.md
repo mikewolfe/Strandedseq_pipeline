@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.6 - 2021-12-08
+
+### Added
+- Added relative polymerase progression calculation to `bwtools_query` (http://dx.doi.org/10.1016/j.molcel.2014.02.005)
+- Add the ability to smooth raw signals using convolution with a Gaussian or flat kernel. 
+- Add the ability to smooth raw signals using a Savitzky-Golay filter
+- Ability to calculate the region-level spearman correlations for a set of samples in `bwtools_query`
+- Add calculations of the traveling ratio (10.1016/j.molcel.2008.12.021)
+- Add discovery of a local max within a region
+
+### Changed
+- Output of `bwtools_query` is now compressed (gzip). File extension changed to `.tsv.gz`
+
 ## 0.2.5 - 2021-10-25
 
 ### Added

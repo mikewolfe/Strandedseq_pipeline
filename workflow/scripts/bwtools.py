@@ -111,6 +111,43 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
+def smooth(arrays, wsize, kernel_type, edge, sigma = None):
+    """
+    Smooth data using a convolution with a kernel (flat or gaussian).
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        wsize (int) - size of half the window in res (i.e if res is 5 and wsize
+                      is 5 then the wsize in bp is 5*5)
+        kernel_type (str) - "gaussian" or "flat" for the kernel. sd is set to span the window
+        edge (str) - "mirror" or "wrap" for dealing with the edges
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge, sigma)
+    return arrays
+
+def savgol(arrays, wsize, polyorder, edge):
+    """
+    Smooth data using a Savtizky-Golay filter
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        wsize (int) - size of half the window in res (i.e if res is 5 and wsize
+                      is 5 then the wsize in bp is 5*5)
+        polyorder (int) - order of polynomial to fit within each window. Can't
+                          be larger than the total window size. 
+                          Higher order smooths less.
+        edge (str) - "mirror" or "wrap" for dealing with the edges
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.savgol_1D(arrays[chrm], wsize, polyorder=polyorder, edge=edge)
+    return arrays
+
+
 def fixed_subtract(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -211,7 +248,10 @@ def manipulate_main(args):
             "scale_max": lambda x: scale_max(x, 1000, args.res),
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
-            "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func])}
+            "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
+            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
+            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge)}
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -234,7 +274,7 @@ def read_multiple_bws(bw_files, res = 1):
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
     return (all_bws, open_fhandles)
 
-def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
+def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     coordinates = []
@@ -256,14 +296,32 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res):
         coordinates.extend(these_coordinates)
         region_names.extend([region["name"]]*len(these_coordinates))
 
-    with open(args.outfile, mode = "w") as outf:
-        header = "region\tcoord\t%s"%("\t".join(samp_names))
-        outf.write(header + "\n")
-        for i, (region, coord) in enumerate(zip(region_names, coordinates)):
-            values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
-            outf.write("%s\t%s\t%s\n"%(region, coord, values))
+    header = "region\tcoord\t%s"%("\t".join(samp_names)) + "\n"
+    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    if gzip:
+        with gzip.open(args.outfile, mode = "wb") as outf:
+            outf.write(header.encode())
+            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
+                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+                outf.write(line.encode())
+    else:
+        with open(args.outfile, mode = "w") as outf:
+            outf.write(header)
+            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
+                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+                outf.write(line)
 
-def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25):
+def relative_polymerase_progression(array):
+    return arraytools.weighted_center(array, only_finite = True, normalize = True) 
+
+def traveling_ratio(array, res, wsize, maxsize):
+    return arraytools.traveling_ratio(array, wsize = wsize//res, length_cutoff = maxsize//res)
+
+def summit_loc(array, res, wsize, upstream):
+    loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
+    return loc*res - upstream
+
+def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     for region in inbed:
@@ -280,18 +338,30 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
             these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
             # add a filter for regions that have high amounts of nans
             if (np.sum(np.isnan(these_values)) / len(these_values)) < frac_na:
-                this_summary = summary_func(these_values)
+                if region["strand"] == "-":
+                    this_summary = summary_func(these_values[::-1])
+                else:
+                    this_summary = summary_func(these_values)
             else:
                 this_summary = np.nan
             outvalues[fname].append(this_summary)
         region_names.append(region["name"])
 
-    with open(args.outfile, mode = "w") as outf:
-        header = "region\t%s"%("\t".join(samp_names))
-        outf.write(header + "\n")
-        for i, region in enumerate(region_names):
-            values = "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
-            outf.write("%s\t%s\n"%(region, values))
+    header = "region\t%s"%("\t".join(samp_names)) + "\n"
+    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    if gzip:
+        with gzip.open(args.outfile, mode = "wb") as outf:
+            outf.write(header.encode())
+            for i, region in enumerate(region_names):
+                line = "%s\t%s\n"%(region, values_func(i))
+                outf.write(line.encode())
+    else:
+
+        with open(args.outfile, mode = "w") as outf:
+            outf.write(header)
+            for i, region in enumerate(region_names):
+                line = "%s\t%s\n"%(region, values_func(i))
+                outf.write(line)
 
         
 def query_main(args):
@@ -301,6 +371,8 @@ def query_main(args):
     inbed.from_bed_file(args.regions)
     res = args.res
     all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
+    if args.gzip:
+        import gzip
     
     if args.samp_names:
         samp_to_fname = {samp_name : fname for fname, samp_name in zip(args.infiles, args.samp_names)}
@@ -312,20 +384,23 @@ def query_main(args):
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
-            'min' : np.nanmin}
+            'min' : np.nanmin,
+            'RPP' : relative_polymerase_progression,
+            'TR' : lambda array: traveling_ratio(array, args.res, 50, 1000),
+            'summit_loc': lambda array: summit_loc(array, args.res, 50, args.upstream)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
         KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
     overall_funcs = {'identity' : query_summarize_identity,
-        'single' : lambda x, y, z, a, b: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na)}
+        'single' : lambda x, y, z, a, b, c: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na, c)}
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
         KeyError("%s is not a valid option for --summarize"%(args.summarize))
 
-    overall_func(all_bws, samp_names, samp_to_fname, inbed, res)
+    overall_func(all_bws, samp_names, samp_to_fname, inbed, res, gzip)
     
     for fhandle in open_fhandles:
         fhandle.close()
@@ -422,7 +497,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -438,6 +513,20 @@ if __name__ == "__main__":
             help = "For methods that use regions. What summary function do you want to use over \
                     said regions. Options: mean, median, sum \
                     Default = mean ")
+    parser_manipulate.add_argument('--wsize', type = int, help = "For smoothing methods \
+            specifies half the window size in units of res. Thus, a wsize of 5 with \
+            resolution 5 is a 5*5 = 25 bp window. wsize is half the window so \
+            the total window size is wsize*2 + 1")
+    parser_manipulate.add_argument('--edge', default = "mirror", type = str,
+            help = "For smoothing methods how to deal with the edge? 'mirror' takes \
+            half the window on each end and mirrors it. 'wrap' wraps the entire array \
+            around which is ideal for circular chromosomes. Default = 'mirror'"),
+    parser_manipulate.add_argument('--savgol_poly', type = int,
+            help = "For Savtizky-Golay smoothing what order polynomial? Must not \
+            be larger than the full window size.")
+    parser_manipulate.add_argument('--gauss_sigma', type = int,
+            help = "For gaussian smoothing what is sigma? Must not \
+            be larger than the full window size. Default is wsize*2/6")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 
@@ -468,7 +557,9 @@ if __name__ == "__main__":
     parser_query.add_argument('--frac_na', type = float, help = "When reporting summaries for regions, how much of the region\
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
-            'identity' summary. mean, median, max, min supported. Default = 'mean'", default = "mean")
+            'identity' summary. mean, median, max, min supported. Additionally, traveling ratio ('TR') and relative polymerase progression ('RPP'), \
+            and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
+    parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.set_defaults(func=query_main)
 
     # compare verb
