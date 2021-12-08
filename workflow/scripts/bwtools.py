@@ -557,8 +557,8 @@ if __name__ == "__main__":
     parser_query.add_argument('--frac_na', type = float, help = "When reporting summaries for regions, how much of the region\
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
-            'identity' summary. mean, median, max, min supported. Additionally, traveling ratio (TR) and relative polymerase progression (RP) are \
-            supported. Default = 'mean'", default = "mean")
+            'identity' summary. mean, median, max, min supported. Additionally, traveling ratio ('TR') and relative polymerase progression ('RPP'), \
+            and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
     parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.set_defaults(func=query_main)
 
