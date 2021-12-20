@@ -209,10 +209,10 @@ peak_calling:
         # a filesignature does not need to specified.
 
         # specify a parameter string used to control macs2
-        # -f BAMPE is automatically specified and -g EFFECTIVE_GENOME_SIZE is
+        # -g EFFECTIVE_GENOME_SIZE is
         # automatically determined.
         macs2_param_string: 
-            value: "--broad"
+            column: macs2_params
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:

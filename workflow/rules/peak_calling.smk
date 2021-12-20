@@ -79,12 +79,12 @@ rule macs2_call_peaks:
     params:
         macs2_param_string = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["peak_calling", wildcards.model, "macs2_param_string"], wildcards.sample,\
-        "--broad") 
+        "-f BAMPE --broad") 
     conda:
         "../envs/peak_calling.yaml"
     shell:
         "macs2 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
         "--outdir results/peak_calling/{wildcards.model}/macs2/ "
-        "-f BAMPE  {params.macs2_param_string} "
+        "{params.macs2_param_string} "
         "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}"
 
