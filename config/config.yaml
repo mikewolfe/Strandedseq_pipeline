@@ -219,7 +219,7 @@ variant_calling:
     # Which samples do you want to run variant calling on. Typically
     # only the input samples as specified by having no sample name in
     # the "input_sample" column
-    filter: "input_sample.isnull()"
+    filter: "input_sample.isnull() or not input_sample.isnull()"
     # Which reference to compare against. Reference must be defined above
     # in the reference section. Can specify a single value for all samples
     # or a column in the metadata sheet to define a reference for each
