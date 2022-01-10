@@ -46,7 +46,7 @@ rule fastqc_raw:
     input:
        lambda wildcards: match_fastq_to_sample(wildcards.sample, wildcards.pair, pep) 
     output:
-        "results/quality_control/fastqc_raw/{sample}_{pair}_fastqc.html"
+        "results/quality_control/fastqc_raw/{sample}_raw_{pair}_fastqc.html"
     threads: 1
     resources:
         mem_mb=5000
@@ -56,7 +56,7 @@ rule fastqc_raw:
     conda:
         "../envs/quality_control.yaml"
     shell:
-        "zcat {input:q} | fastqc stdin:{wildcards.sample}_{wildcards.pair} "
+        "zcat {input:q} | fastqc stdin:{wildcards.sample}_raw_{wildcards.pair} "
         "-o results/quality_control/fastqc_raw > {log.stdout} 2> {log.stderr}"
 
 def fastqc_processed_input(sample, pair, pep):
@@ -84,7 +84,8 @@ rule fastqc_processed:
         stdout="results/quality_control/logs/fastqc_processed/{sample}_processed_{pair}.log",
         stderr="results/quality_control/logs/fastqc_processed/{sample}_processed_{pair}.err"
     shell:
-        "fastqc {input} -o results/quality_control/fastqc_processed > {log.stdout} 2> {log.stderr}"
+        "zcat {input:q} | fastqc stdin:{wildcards.sample}_processed_{wildcards.pair} "
+        "-o results/quality_control/fastqc_processed > {log.stdout} 2> {log.stderr}"
 
 # ChIP QC will be done by groups thus we need to write a few helpers
 
