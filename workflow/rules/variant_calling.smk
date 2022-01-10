@@ -70,11 +70,21 @@ def format_references(all_files):
         out_str += "-r %s "%(this_file)
     return out_str
 
+
+def processed_fastqs(sample, pep):
+    se = determine_single_end(sample, pep)
+    out = []
+    if se:
+        out.append("results/preprocessing/trimmomatic/%s_trim_R0.fastq.gz"%(sample))
+    else:
+        out.append("results/preprocessing/trimmomatic/%s_trim_paired_R1.fastq.gz"%(sample))
+        out.append("results/preprocessing/trimmomatic/%s_trim_paired_R2.fastq.gz"%(sample))
+    return out
+
 rule breseq:
     message: "Running breseq on {wildcards.sample}"
     input:
-        fastq_R1 = "results/preprocessing/trimmomatic/{sample}_trim_paired_R1.fastq.gz",
-        fastq_R2 = "results/preprocessing/trimmomatic/{sample}_trim_paired_R2.fastq.gz",
+        processed_fastqs = lambda wildcards: processed_fastqs(wildcards.sample, pep),
         reference_files = lambda wildcards: get_references_per_sample(wildcards.sample, pep)
     output:
         "results/variant_calling/breseq/{sample}/output/summary.html",
@@ -89,7 +99,7 @@ rule breseq:
     conda:
         "../envs/variant_calling.yaml"
     shell:
-        "breseq {params.reference_file_string} {input.fastq_R1} {input.fastq_R2} "
+        "breseq {params.reference_file_string} {input.processed_fastqs} "
         "-n {wildcards.sample} "
         "-o results/variant_calling/breseq/{wildcards.sample} "
         "-j {threads} > {log.stdout} 2> {log.stderr}"

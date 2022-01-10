@@ -59,7 +59,7 @@ rule deeptools_coverage_raw:
         masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep),
         bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
         pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
-        "--samFlagInclude 66 --extendReads --exactScaling --minMappingQuality 10")
+        "--samFlagInclude 67 --extendReads")
 
     threads:
         5

@@ -18,6 +18,28 @@ def lookup_sample_metadata(sample, key, pep):
         raise KeyError("Sample %s not in sample table"%sample)
     return pep.sample_table.at[sample, key]
 
+def match_fastq_to_sample(sample, pair, pep):
+    out = lookup_sample_metadata(sample, "file_path", pep)
+    if pair == "R1" or pair == "R0":
+        out += lookup_sample_metadata(sample, "filenameR1", pep)
+    elif pair == "R2":
+        out += lookup_sample_metadata(sample, "filenameR2", pep)
+    else:
+        raise ValueError("Pair must be R0 (single-end), R1, or R2 not %s"%pair)
+    return out
+
+def determine_single_end(sample, pep):
+    from pandas import isna
+    if "filenameR2" in pep.sample_table:
+        r2 = lookup_sample_metadata(sample, "filenameR2", pep)
+        if isna(r2):
+            out = True
+        else:
+            out = False
+    else:
+        out = True
+    return out
+
 def lookup_in_config(config, keys, default = None, err= None):
     curr_dict = config
     try:

@@ -68,6 +68,15 @@ alignment:
         samtools_view_param_string:
             value: "-b"
 
+    bowtie2_map_se:
+        # controls how bowtie2 does its alignments for single end data
+        bowtie2_param_string:
+            value: "--end-to-end --very-sensitive --phred33"
+        # controls samtools filtering as reads come out of bowtie2. Default
+        # is to just convert the sam records into a bam with -b
+        samtools_view_param_string:
+            value: "-b"
+
 
 # Options to control genome coverage calculations
 coverage_and_norm:
@@ -98,7 +107,10 @@ coverage_and_norm:
     # or as a column in the sample_sheet using column: column_name
     deeptools_coverage:
         bamCoverage_param_string:
-            value: "--samFlagInclude 66 --extendReads --exactScaling"
+            # Rather than set this for all samples
+            #value: "--samFlagInclude 67 --extendReads"
+            # We will instead set it for each sample by specifying a column
+            column: "bamCoverage_params"
     bwtools_median:
         # pseudocount is added before normalizing by the median
         pseudocount:
@@ -197,17 +209,17 @@ peak_calling:
         # a filesignature does not need to specified.
 
         # specify a parameter string used to control macs2
-        # -f BAMPE is automatically specified and -g EFFECTIVE_GENOME_SIZE is
+        # -g EFFECTIVE_GENOME_SIZE is
         # automatically determined.
         macs2_param_string: 
-            value: "--broad"
+            column: macs2_params
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:
     # Which samples do you want to run variant calling on. Typically
     # only the input samples as specified by having no sample name in
     # the "input_sample" column
-    filter: "input_sample.isnull()"
+    filter: "input_sample.isnull() or not input_sample.isnull()"
     # Which reference to compare against. Reference must be defined above
     # in the reference section. Can specify a single value for all samples
     # or a column in the metadata sheet to define a reference for each
