@@ -496,7 +496,7 @@ def open_multiple_bigwigs(file_list):
 def convert_bigwigs_to_arrays(handle_list, res = 5):
     out_arrays = []
     for handle in handle_list:
-        out_arrays.append(bigwig_to_arrays(handle))
+        out_arrays.append(bigwig_to_arrays(handle, res = res))
     return out_arrays
         
 def close_multiple_bigwigs(handle_list):
@@ -542,7 +542,6 @@ def multicompare_main(args):
         close_multiple_bigwigs(groupB_handles)
     else:
         arrays_out = groupA_array
-
 
     # write out file
     write_arrays_to_bigwig(args.outfile, arrays_out, groupA_handles[0].chroms(), \
