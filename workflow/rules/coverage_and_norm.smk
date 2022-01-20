@@ -523,3 +523,70 @@ rule bwtools_ratio:
         "--res {params.resolution} "
         "{params.dropNaNsandInfs} "
         "> {log.stdout} 2> {log.stderr}"
+
+def pull_bws_for_bwtools_multicompare(modelname, config, pep):
+    groupA_samples = filter_samples(pep, \
+    lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_groupA']))
+
+    groupB_filter = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_groupB'], "")
+    file_sig = lookup_in_config(config, ['coverage_and_norm', modelname, 'filesignature'],\
+    "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
+    groupA = [file_sig%(sample) for sample in groupA_samples]
+    if groupB_filter is not "":
+        for sample in filter_samples(pep, groupB_filter):
+            groupA.append(file_sig%(sample))
+    return groupA
+
+def grouped_bws_for_bwtools_multicompare(modelname, config, pep, group_name):
+    group_sample_filter = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_%s'%group_name], "")
+    file_sig = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filesignature'],\
+    "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
+    if group_sample_filter is not "":
+        group = " ".join([file_sig%(sample) for sample in filter_samples(pep, group_sample_filter)])
+        group = "--%s "%(group_name) + group
+    else:
+        group = " "
+    return group
+
+
+
+rule bwtools_multicompare:
+    input:
+        lambda wildcards: pull_bws_for_bwtools_multicompare(wildcards.model, config, pep)
+    output:
+        "results/coverage_and_norm/bwtools_multicompare/{model}.bw"
+    params:
+        resolution = RES,
+        groupA = lambda wildcards: grouped_bws_for_bwtools_multicompare(wildcards.model, config, pep, "groupA"),
+        groupB = lambda wildcards: grouped_bws_for_bwtools_multicompare(wildcards.model, config, pep, "groupB"),
+        within_op = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", 'bwtools_multicompare', wildcards.model, "within_operation"], "mean"),
+        btwn_op = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", 'bwtools_multicompare', wildcards.model, "between_operation"], "subtract"),
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_multicompare/{model}.log",
+        stderr="results/coverage_and_norm/logs/bwtools_multicompare/{model}.err"
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py multicompare {output} {params.groupA} {params.groupB} "
+        "--within_operation {params.within_op} "
+        "--between_operation {params.btwn_op} "
+        "--res {params.resolution} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
+
+def determine_multicompare_models(config):
+    outfiles = []
+    if lookup_in_config(config, ["coverage_and_norm", "bwtools_multicompare"], ""):
+        outfiles.extend(["results/coverage_and_norm/bwtools_multicompare/%s.bw"%model\
+        for model in config["coverage_and_norm"]["bwtools_multicompare"]])
+    return outfiles
+
+rule run_bwtools_multicompare:
+    input:
+        determine_multicompare_models(config)
+
+

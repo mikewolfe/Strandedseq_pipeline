@@ -479,6 +479,76 @@ def compare_main(args):
     inf1.close()
     inf2.close()
 
+def check_same_chromosomes(array_list):
+    chrms = array_list[0].keys()
+    out = True
+    for array in array_list:
+        if set(array) != set(chrms):
+            out = False
+    return out
+
+def open_multiple_bigwigs(file_list):
+    out_handles = []
+    for inf in file_list:
+        out_handles.append(pyBigWig.open(inf))
+    return out_handles
+
+def convert_bigwigs_to_arrays(handle_list, res = 5):
+    out_arrays = []
+    for handle in handle_list:
+        out_arrays.append(bigwig_to_arrays(handle))
+    return out_arrays
+        
+def close_multiple_bigwigs(handle_list):
+    for handle in handle_list:
+        handle.close()
+
+def multicompare_within_group(array_list, function = np.nanmean):
+    # check to make sure the arrays list is ok
+    if not check_same_chromosomes(array_list):
+        raise ValueError("Can't merge bigwigs with different chromosomes")
+    out_array = {}
+    for chrm in array_list[0].keys():
+        chrm_list = [array[chrm] for array in array_list]
+        out_array[chrm] = function(chrm_list, axis = 0)
+    return out_array
+
+
+def multicompare_main(args):
+    within_operation_dict = {"mean": np.nanmean,
+            "median": np.nanmedian,
+            "max": np.nanmax,
+            "min": np.nanmin}
+    between_operation_dict ={"log2ratio": compare_log2ratio,
+            "add": compare_add,
+            "subtract": compare_subtract,
+            "divide": compare_divide,
+            "recipratio": compare_recipratio}
+    #read in files
+    groupA_handles = open_multiple_bigwigs(args.groupA)
+    groupA_arrays = convert_bigwigs_to_arrays(groupA_handles, res = args.res)
+
+    # convert to one set of arrays
+    groupA_array = multicompare_within_group(groupA_arrays, function = within_operation_dict[args.within_operation])
+
+    if args.groupB is not None:
+        groupB_handles = open_multiple_bigwigs(args.groupB)
+        groupB_arrays = convert_bigwigs_to_arrays(groupB_handles, res = args.res)
+        groupB_array = multicompare_within_group(groupB_arrays, function = within_operation_dict[args.within_operation])
+
+
+        # perform between operation
+        arrays_out = between_operation_dict[args.between_operation](groupA_array, groupB_array)
+        close_multiple_bigwigs(groupB_handles)
+    else:
+        arrays_out = groupA_array
+
+
+    # write out file
+    write_arrays_to_bigwig(args.outfile, arrays_out, groupA_handles[0].chroms(), \
+            res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+    close_multiple_bigwigs(groupA_handles)
+
  
 if __name__ == "__main__":
     import argparse
@@ -576,6 +646,23 @@ if __name__ == "__main__":
     parser_compare.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
     parser_compare.set_defaults(func=compare_main)
+
+    # multicompare verb
+    parser_multicompare = subparsers.add_parser("multicompare", help = "Calculate operations between two groups of BigWig files or a summary operation on one group")
+    parser_multicompare.add_argument("outfile", type=str, help = "file to output to")
+    parser_multicompare.add_argument("--groupA", type=str, nargs ="+", help = "input file 1")
+    parser_multicompare.add_argument("--groupB", type=str, nargs = "+", help = "input file 2")
+    parser_multicompare.add_argument('--res', type=int, default=1,
+            help="Resolution to compute statistics at. Default 1bp. Note this \
+            should be set no lower than the resolution of the input files")
+    parser_multicompare.add_argument('--within_operation', type = str, default = "mean",
+            help = "Default is mean. Options are median, max, and min.")
+    parser_multicompare.add_argument('--between_operation', type=str, default="log2ratio",
+            help="Default is log2ratio i.e. log2(infile1) - log2(infile2). Other \
+                    options include: add, subtract, divide, recipratio (invert ratios less than 1. Center at 0)")
+    parser_multicompare.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output bigwig")
+    parser_multicompare.set_defaults(func=multicompare_main)
     
     args = parser.parse_args()
     args.func(args) 

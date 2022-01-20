@@ -176,6 +176,19 @@ coverage_and_norm:
         number_of_regions:
             value: 20
 
+    bwtools_multicompare:
+        # Allows you to perform operations on multiple bigwigs.
+        mean_genotypeA:
+            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            operation_within: "mean"
+        mean_genotypeA_minus_mean_genotypeB:
+            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupB: 'genotype == "B" and not input_sample.isnull()'
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            operation_within: "mean"
+            operation_btwn: "subtract"
+
 # Options to control quality control
 quality_control:
     # what column to group samples by for ChIP-QC output plots?
