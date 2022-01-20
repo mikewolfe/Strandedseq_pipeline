@@ -6,7 +6,7 @@ that can be easily deployed in any computational environment. Currently this pip
 aimed at processing ChIP-seq samples with the following 
 characteristics:
 
-- Paired-end short-read illumina sequencing data
+- Short-read illumina sequencing data
 - Smaller genome sizes such as bacterial genomes
 
 # What the pipeline does
@@ -148,7 +148,7 @@ If you run into any issues with the pipeline and would like help please submit i
 # Version history
 
 
-Currently at version 0.2.7
+Currently at version 0.2.8
 
 
 See the [Changelog](CHANGELOG.md) for version history and upcoming
