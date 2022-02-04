@@ -1,10 +1,18 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-≥5.24.2-brightgreen.svg)](https://snakemake.bitbucket.io) [![PEP compatible](http://pepkit.github.io/img/PEP-compatible-green.svg)](http://pepkit.github.io)
-# A fully portable and reproducible ChIP-seq pipeline
+# A portable and reproducible pipeline for analyzing stranded read coverage
 
-The goal of this project is to create a reproducible analysis pipeline for ChIP-seq data 
-that can be easily deployed in any computational environment. Currently this pipeline is
-aimed at processing ChIP-seq samples with the following 
-characteristics:
+The goal of this project is to create a reproducible analysis pipeline for
+sequencing data that gives stranded information. This is a fork of my
+[`ChIPseq_pipeline`](github.com/mikewolfe/ChIPseq_pipeline/) but has
+independent development.
+
+The goals of this pipeline are to support data from:
+
+- bisulfite sequencing
+- NET-seq
+- RNA-seq read coverage
+
+This pipeline is focused on:
 
 - Short-read illumina sequencing data
 - Smaller genome sizes such as bacterial genomes
