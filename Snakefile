@@ -1,5 +1,5 @@
 # control of the pipeline
-configfile: "config/config.yaml"
+configfile: "config/run_config.yaml"
 # sample metadata and information
 pepfile: "pep/config.yaml"
 
