@@ -59,6 +59,7 @@ alignment:
             value: "CDS tRNA rRNA ncRNA"
         qual_name: 
             value: "gene locus_tag"
+
     bowtie2_map:
         # controls how bowtie2 does its alignments
         bowtie2_param_string:
@@ -82,19 +83,40 @@ alignment:
 coverage_and_norm:
 
     # what resolution in bp do you want the coverage to be calculated?
-    resolution: 5
-    # general controls - these only control what is automatically run
-    # when running the whole pipeline or module.
-    # how to normalize within a sample. Options include:
-    # RPKM, CPM, BPM, RPGC, median, and SES. See deeptools manual for
-    # details on these normalization methods.
-    within: median
+    # NET-seq should be single bp resolution
+    resolution: 1
     # drop NaNs and Infs from zero coverage in input or extracted
     # Note
     # that bigwigs will not display properly in IGV if they have nans or infs
     dropNaNsandInfs: true
-    # Robust Z scale the log2ratio of extracted to input
-    RobustZ: true
+
+    # rule specific controls
+    # Each of these can be specified either as a single value for every sample
+    # or as a column in the sample_sheet using column: column_name
+    deeptools_coverage:
+        bamCoverage_param_string:
+            # Want only the 5' end of the read (which is really the
+            # 3' end of the NET-seq read)
+            value: "--samFlagInclude 67 --Offset 1"
+    bwtools_spike_scale:
+        # This controls how the spike-in regions are used to scale the
+        # data when scaling to a spike-in.
+        # Specify the regions to consider for the spike-in here as a bed.
+        # Below is a placeholder you would want to put in your own bed here
+        fixed_regions:
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+
+        # What to do with the values in the spike-in sample? This sums the
+        # coverage to use as a scaling factor. You could also use mean or
+        # median over the regions considered.
+        summary_func:
+            value: "mean"
+
+    bwtools_median:
+        # pseudocount is added before normalizing by the median
+        pseudocount:
+            value: 1
+
     # Which samples should be smoothed? Smoothing currently only supported for
     # spike-in and median normalization. This smooths everything.
     # If only want inputs smoothed ('input_sample.isnull()').
@@ -102,19 +124,6 @@ coverage_and_norm:
     # input_sample.isnull()')
     smooth_samples:
         filter: 'input_sample.isnull() or not input_sample.isnull()'
-    # rule specific controls
-    # Each of these can be specified either as a single value for every sample
-    # or as a column in the sample_sheet using column: column_name
-    deeptools_coverage:
-        bamCoverage_param_string:
-            # Rather than set this for all samples
-            #value: "--samFlagInclude 67 --extendReads"
-            # We will instead set it for each sample by specifying a column
-            column: "bamCoverage_params"
-    bwtools_median:
-        # pseudocount is added before normalizing by the median
-        pseudocount:
-            value: 0
     #Control the smoothing type and windowsize
     #Types of smoothing to specify with --operation
     #   - flat_smooth - convolution with a flat kernel (rolling mean)
@@ -137,18 +146,6 @@ coverage_and_norm:
     bwtools_smooth:
         param_string:
             value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
-    bwtools_spike_scale:
-        # This controls how the spike-in regions are used to scale the
-        # data when scaling to a spike-in.
-        # Specify the regions to consider for the spike-in here as a bed.
-        # Below is a placeholder you would want to put in your own bed here
-        fixed_regions:
-            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
-        # What to do with the values in the spike-in sample? This sums the
-        # coverage to use as a scaling factor. You could also use mean or
-        # median over the regions considered.
-        summary_func:
-            value: "mean"
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -285,7 +282,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -305,7 +302,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_minus_median_ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -330,7 +327,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
@@ -350,7 +347,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_minus_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
@@ -373,7 +370,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_plus_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
