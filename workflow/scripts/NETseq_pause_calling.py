@@ -70,7 +70,7 @@ class RegionWindow(object):
     def __iter__(self):
         for index in np.arange(0, len(self.array)):
             if self.strand == "-":
-                rel_coord = self.end - index
+                rel_coord = len(self.array) - index - 1
             else:
                 rel_coord = index
             abs_coord = self.start + index
@@ -80,22 +80,27 @@ class RegionWindow(object):
         self.array = arrays[self.chrm][self.start:self.end]
 
     def larson_method(self):
+        out = []
         mean = np.nanmean(self.array)
         stdev = np.nanstd(self.array)
         for index, abs_coord, rel_coord in self:
             this_value = self.array[index]
             pvalue = sci_stats.norm.sf(this_value, mean, stdev)
-            yield (self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, pvalue)
+            out.append((self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, mean, stdev, pvalue))
+        return out
 
     def poisson_method(self): 
+        out = []
         total = self.array.sum()
         mu = total/len(self.array) 
         for index, abs_coord, rel_coord in self:
             this_value = self.array[index]
             pvalue = sci_stats.poisson.sf(this_value, mu)
-            yield (self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, pvalue)
+            out.append((self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, mu, pvalue))
+        return out
  
     def bootstrap_method(self, n_boot = 10000, rng = np.random.default_rng()):
+        out = []
         # get the total number of counts
         total = self.array.sum()
         # redistribute equally using a multinomial for n_boot times
@@ -104,7 +109,8 @@ class RegionWindow(object):
             this_value = self.array[index]
             total_greater_eq = np.sum(np.max(samples, axis=1) >= this_value) 
             pvalue = (total_greater_eq + 1)/ (n_boot + 1)
-            yield (self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, total_greater_eq, pvalue)
+            out.append((self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, total/len(self.array), total_greater_eq, pvalue))
+        return out
 
     def avg_coverage_filter(self, cutoff):
         return np.nanmean(self.array) > cutoff
@@ -177,56 +183,98 @@ def genomewide_main(args):
                     # passes all filters
                     filter(lambda window: all([f(window) for f in all_filters]),
                     # This generates a window for each possible location in the array
-                    window_generator(array[0:100000], args.wsize, circ = args.circular)), args.seed))
+                    window_generator(array, args.wsize, circ = args.circular)), args.seed))
         pool.close()
         pool.join()
         for val in output:
             sys.stdout.write("%s\t%s\t%s\t.\t%s\t+\t%s\n"%(chrm, val[0], val[1], val[2], "\t".join([str(entry) for entry in val[3:]])))
+
+    for chrm, array in arrays_minus.items():
+        pool = mp.Pool(args.p)
+        # allow the windows to be distributed over the processes
+        output = pool.starmap(methods[args.method], 
+                # add a new random seed for each process. Otherwise will use the
+                # same seed for every process
+                augment_with_random_state(
+                    # super filter goes here. Checks each window to make sure it
+                    # passes all filters
+                    filter(lambda window: all([f(window) for f in all_filters]),
+                    # This generates a window for each possible location in the array
+                    window_generator(array, args.wsize, circ = args.circular)), args.seed))
+        pool.close()
+        pool.join()
+        for val in output:
+            sys.stdout.write("%s\t%s\t%s\t.\t%s\t-\t%s\n"%(chrm, val[0], val[1], val[2], "\t".join([str(entry) for entry in val[3:]])))
         plus_strand.close()
         minus_strand.close()
 
 
-#def region_main(args):
-#    
-#    # read in bw files
-#    plus_strand = bwtools.pyBigWig.open(args.infile_plus)
-#    minus_strand = bwtools.pyBigWig.open(args.infile_minus)
-#
-#    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
-#    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
-#
-#    # function factory for different methods
-#    methods = {'bootstrap': lambda(window, rng): window.bootstrap_method(rng = rng),
-#            'Poisson': lambda(window, rng): window.poisson_method(),
-#            'Larson': lambda(window, rng): window.larson_method()}
-#    headers = {'bootstrap': "chrm\tstart\tend\t.\tcount\tstrand\texp_count\ttotal_count\tsamp_gr_eq\tpvalue\n",
-#               'Poisson': "chrm\tstart\tend\t.\tcount\tstrand\texp_count\ttotal_count\tpvalue\n",
-#               'Larson': "chrm\tstart\tend\t.\tcount\tstrand\tmean_count\tstd_count\tpvalue\n"}
-#
-#    # function factory for different filters
-#    filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
-#               'avg_cov': lambda window: window.avg_coverage_filter(args.avg_cov_cutoff),
-#               'max': lambda window: window.max_filter()}
-#    # combine the filters into a filter list
-#    all_filters = [filters[val] for val in args.filters]
-#    
-#    sys.stdout.write(headers[args.method])
-#    for chrm, array in arrays_plus.items():
-#        pool = mp.Pool(args.p)
-#        # allow the windows to be distributed over the processes
-#        output = pool.starmap(methods[args.method], 
-#                # add a new random seed for each process. Otherwise will use the
-#                # same seed for every process
-#                augment_with_random_state(
-#                    # super filter goes here. Checks each window to make sure it
-#                    # passes all filters
-#                    filter(lambda window: all([f(window) for f in all_filters]),
-#                    # This generates a window for each possible location in the array
-#                    window_generator(array[0:100000], args.wsize, circ = args.circular)), args.seed))
-#        pool.close()
-#        pool.join()
-#        for val in output:
-#            sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\n"%(chrm, val[0], val[1], val[2], "\t".join([str(entry) for entry in val[3:]]))
+def region_main(args):
+    import bed_utils
+    
+    # read in bw files
+    plus_strand = bwtools.pyBigWig.open(args.infile_plus)
+    minus_strand = bwtools.pyBigWig.open(args.infile_minus)
+
+    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
+    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
+
+    # function factory for different methods
+    methods = {'bootstrap': multiprocess_bootstrap,
+            'Poisson': multiprocess_poisson,
+            'Larson': multiprocess_larson}
+
+    headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tsamp_gr_eq\tpvalue\n",
+               'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tpvalue\n",
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\tmean\tstdev\tpvalue\n"}
+
+    # function factory for different filters
+    filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
+               'avg_cov': lambda window: window.avg_coverage_filter(args.avg_cov_cutoff),
+               'max': lambda window: window.max_filter()}
+
+    # combine the filters into a filter list
+    if len(args.filters) > 0:
+        all_filters = [filters[val] for val in args.filters]
+    else:
+        all_filters = [lambda window: True]
+    
+    sys.stdout.write(headers[args.method])
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(args.bedfile) 
+    pool = mp.Pool(args.p)
+    output = pool.starmap(methods[args.method], 
+                augment_with_random_state(
+                    # super filter goes here. Checks each window to make sure it
+                    # passes all filters
+                    filter(lambda window: all([f(window) for f in all_filters]),
+                    # This generates a window for each possible location in the array
+                    bed_regions(arrays_plus, inbed.filter_entries(lambda entry: entry["strand"] == "+"))), args.seed))
+    pool.close()
+    pool.join()
+
+    pool = mp.Pool(args.p)
+    for region in output:
+        for val in region:
+            sys.stdout.write("%s\n"%("\t".join([str(entry) for entry in val])))
+
+    output = pool.starmap(region_multiprocess_helper, 
+                augment_with_random_state(
+                    # super filter goes here. Checks each window to make sure it
+                    # passes all filters
+                    filter(lambda window: all([f(window) for f in all_filters]),
+                    # This generates a window for each possible location in the array
+                    bed_regions(arrays_minus, inbed.filter_entries(lambda entry: entry['strand'] == "-"))), args.seed))
+    pool.close()
+    pool.join()
+    for region in output:
+        for val in region:
+            sys.stdout.write("%s\n"%("\t".join([str(entry) for entry in val])))
+
+    plus_strand.close()
+    minus_strand.close()
+
+
  
 
 if __name__ == "__main__":
@@ -238,7 +286,6 @@ if __name__ == "__main__":
     parser_genome = subparsers.add_parser("Genomewide", help = "Call pauses across the entire genome")
     parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
     parser_genome.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the plus strand")
-    parser_genome.add_argument('outfile', type = str, help = "output file prefix to write, extension will be tsv.gz format")
     parser_genome.add_argument('wsize', type = int, help = "Half the window size. Adds to each side of the query bp. I.e. 100 would give you a \
             total of a 201 bp window with the query bp in the center. Default = 100", default = 100)
     parser_genome.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
@@ -247,7 +294,7 @@ if __name__ == "__main__":
     parser_genome.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
     parser_genome.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
     parser_genome.add_argument('--filters', type = str, nargs = "+",
-            help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'max', 'avg_cov'. Default = 'avg_cov' 'max'",
+            help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'max', 'avg_cov'. Default = None",
             default = [])
     parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 20",
             default = 20)
@@ -257,50 +304,24 @@ if __name__ == "__main__":
             default = True)
     parser_genome.set_defaults(func=genomewide_main)
 
+
+    parser_genome = subparsers.add_parser("Region", help = "Call pauses across based on defined regions")
+    parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_genome.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_genome.add_argument('bedfile', type=str, help = "bed file containing regions to consider")
+    parser_genome.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
+    parser_genome.add_argument('--method', type = str, help = "Must be one of Larson (gaussian), Poisson, or bootstrap. Default = Poisson",
+            default = "Poisson")
+    parser_genome.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
+    parser_genome.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
+    parser_genome.add_argument('--filters', type = str, nargs = "+",
+            help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'avg_cov'. Default = None",
+            default = [])
+    parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 20",
+            default = 20)
+    parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
+            default = 0.1)
+    parser_genome.set_defaults(func=region_main)
+
     args = parser.parse_args()
     args.func(args)
-
-    
-
-
-
-#    plusfile = sys.argv[1]
-#    minusfile = sys.argv[2]
-#    if len(sys.argv) > 3:
-#        bedfile = sys.argv[3]
-#    else:
-#        bedfile = None
-#
-#    plus_strand = bwtools.pyBigWig.open(plusfile)
-#    minus_strand = bwtools.pyBigWig.open(minusfile)
-#
-#    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
-#    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
-#
-#    if bedfile:
-#        import bed_utils
-#        inbed = bed_utils.BedFile()
-#        inbed.from_bed_file(bedfile) 
-#        pool = mp.Pool(3)
-#        output = pool.starmap(region_multiprocess_helper, 
-#                    augment_with_random_state(
-#                        filter(lambda region: region.avg_coverage_filter(10),
-#                        filter(lambda region: region.zero_filter(0.10), 
-#                        bed_regions(arrays_plus, inbed))), 42))
-#        pool.close()
-#        pool.join()
-#        for region in output:
-#            for val in region:
-#                sys.stdout.write("%s\n"%("\t".join([str(entry) for entry in val])))
-#    else:
-#        for chrm, array in arrays_plus.items():
-#            pool = mp.Pool(3)
-#            output = pool.starmap(genome_multiprocess_helper, 
-#                    augment_with_random_state(
-#                        filter(lambda window: window.max_filter(),
-#                        filter(lambda window: window.coverage_filter(20), 
-#                        window_generator(array[0:100000], 100, circ = False))), 42))
-#            pool.close()
-#            pool.join()
-#            for val in output:
-#                sys.stdout.write("%s\t%s\t%s\n"%(chrm, "+", "\t".join([str(entry) for entry in val])))
