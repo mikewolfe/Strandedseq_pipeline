@@ -79,9 +79,9 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
         outval = default 
     else:
         if err:
-            logger.error(err)
+            raise ValueError(err)
         else:
-            logger.error("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
+            raise ValueError("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
     return outval
             
 
@@ -149,6 +149,7 @@ include: "workflow/rules/peak_calling.smk"
 include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/bisulfite.smk"
+include: "workflow/rules/NETseq.smk"
 
 
 

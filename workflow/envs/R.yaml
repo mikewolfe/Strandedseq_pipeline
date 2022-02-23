@@ -4,3 +4,4 @@ channels:
 dependencies:
     - r>=4.0
     - r-tidyverse
+    - r-ggseqlogo

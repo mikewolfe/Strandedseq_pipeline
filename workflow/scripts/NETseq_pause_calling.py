@@ -1,7 +1,9 @@
 import bwtools
 import numpy as np
 import scipy.stats as sci_stats
+from statsmodels.stats.multitest import fdrcorrection
 import multiprocessing as mp
+import sys
 
 class GenomicWindow(object):
     def __init__(self, coord, array):
@@ -156,13 +158,14 @@ def genomewide_main(args):
             'Poisson': multiprocess_poisson,
             'Larson': multiprocess_larson}
 
-    headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tsamp_gr_eq\tpvalue\n",
-               'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tpvalue\n",
-               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tpvalue\n"}
+    headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tsamp_gr_eq\tpvalue\tqvalue\n",
+               'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tpvalue\tqvalue\n",
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tpvalue\tqvalue\n"}
 
     # function factory for different filters
     filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
                'avg_cov': lambda window: window.avg_coverage_filter(args.avg_cov_cutoff),
+               'cov': lambda window: window.coverage_filter(args.cov_cutoff),
                'max': lambda window: window.max_filter()}
 
     # combine the filters into a filter list
@@ -175,7 +178,7 @@ def genomewide_main(args):
     for chrm, array in arrays_plus.items():
         pool = mp.Pool(args.p)
         # allow the windows to be distributed over the processes
-        output = pool.starmap(methods[args.method], 
+        output_plus = pool.starmap(methods[args.method], 
                 # add a new random seed for each process. Otherwise will use the
                 # same seed for every process
                 augment_with_random_state(
@@ -186,13 +189,11 @@ def genomewide_main(args):
                     window_generator(array, args.wsize, circ = args.circular)), args.seed))
         pool.close()
         pool.join()
-        for val in output:
-            sys.stdout.write("%s\t%s\t%s\t.\t%s\t+\t%s\n"%(chrm, val[0], val[1], val[2], "\t".join([str(entry) for entry in val[3:]])))
 
     for chrm, array in arrays_minus.items():
         pool = mp.Pool(args.p)
         # allow the windows to be distributed over the processes
-        output = pool.starmap(methods[args.method], 
+        output_minus = pool.starmap(methods[args.method], 
                 # add a new random seed for each process. Otherwise will use the
                 # same seed for every process
                 augment_with_random_state(
@@ -203,8 +204,17 @@ def genomewide_main(args):
                     window_generator(array, args.wsize, circ = args.circular)), args.seed))
         pool.close()
         pool.join()
-        for val in output:
-            sys.stdout.write("%s\t%s\t%s\t.\t%s\t-\t%s\n"%(chrm, val[0], val[1], val[2], "\t".join([str(entry) for entry in val[3:]])))
+
+        total_plus = len(output_plus)
+        output = output_plus + output_minus
+        pvals = [val[-1] for val in output]
+        _, qvals = fdrcorrection(pvals, method = "i")
+        strand = "+"
+        for i, (val, qval) in enumerate(zip(output, qvals)):
+            if i >= total_plus:
+                strand = "-"
+            if qval < args.alpha:
+                sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(chrm, val[0], val[1], val[2],strand, "\t".join([str(entry) for entry in val[3:]]), qval))
         plus_strand.close()
         minus_strand.close()
 
@@ -224,9 +234,9 @@ def region_main(args):
             'Poisson': multiprocess_poisson,
             'Larson': multiprocess_larson}
 
-    headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tsamp_gr_eq\tpvalue\n",
-               'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tpvalue\n",
-               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\tmean\tstdev\tpvalue\n"}
+    headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tsamp_gr_eq\tpvalue\tqvalue\n",
+               'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tpvalue\tqvalue\n",
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\tmean\tstdev\tpvalue\tqvalue\n"}
 
     # function factory for different filters
     filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
@@ -243,7 +253,7 @@ def region_main(args):
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(args.bedfile) 
     pool = mp.Pool(args.p)
-    output = pool.starmap(methods[args.method], 
+    output_plus = pool.starmap(methods[args.method], 
                 augment_with_random_state(
                     # super filter goes here. Checks each window to make sure it
                     # passes all filters
@@ -254,11 +264,7 @@ def region_main(args):
     pool.join()
 
     pool = mp.Pool(args.p)
-    for region in output:
-        for val in region:
-            sys.stdout.write("%s\n"%("\t".join([str(entry) for entry in val])))
-
-    output = pool.starmap(region_multiprocess_helper, 
+    output_minus = pool.starmap(region_multiprocess_helper, 
                 augment_with_random_state(
                     # super filter goes here. Checks each window to make sure it
                     # passes all filters
@@ -267,9 +273,13 @@ def region_main(args):
                     bed_regions(arrays_minus, inbed.filter_entries(lambda entry: entry['strand'] == "-"))), args.seed))
     pool.close()
     pool.join()
-    for region in output:
-        for val in region:
-            sys.stdout.write("%s\n"%("\t".join([str(entry) for entry in val])))
+
+    output = [loc for gene in output_plus for loc in gene] + [loc for gene in output_minus for loc in gene]
+    pvals = [val[-1] for val in output]
+    _, qvals = fdrcorrection(pvals, method = "i")
+    for entry, qval in zip(output, qvals):
+        if qval < args.alpha:
+            sys.stdout.write("%s\t%s\n"%("\t".join([str(val) for val in entry]), qval))
 
     plus_strand.close()
     minus_strand.close()
@@ -279,7 +289,6 @@ def region_main(args):
 
 if __name__ == "__main__":
     import argparse
-    import sys
     parser = argparse.ArgumentParser("Python script to call pauses in NET-seq data")
     subparsers = parser.add_subparsers(help = "Supported Commands")
 
@@ -296,32 +305,36 @@ if __name__ == "__main__":
     parser_genome.add_argument('--filters', type = str, nargs = "+",
             help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'max', 'avg_cov'. Default = None",
             default = [])
-    parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 20",
-            default = 20)
+    parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 10",
+            default = 10.0)
+    parser_genome.add_argument('--cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 1",
+            default = 1.0)
     parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
     parser_genome.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
             default = True)
+    parser_genome.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
     parser_genome.set_defaults(func=genomewide_main)
 
 
-    parser_genome = subparsers.add_parser("Region", help = "Call pauses across based on defined regions")
-    parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
-    parser_genome.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the plus strand")
-    parser_genome.add_argument('bedfile', type=str, help = "bed file containing regions to consider")
-    parser_genome.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
-    parser_genome.add_argument('--method', type = str, help = "Must be one of Larson (gaussian), Poisson, or bootstrap. Default = Poisson",
+    parser_region = subparsers.add_parser("Region", help = "Call pauses across based on defined regions")
+    parser_region.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_region.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_region.add_argument('bedfile', type=str, help = "bed file containing regions to consider")
+    parser_region.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
+    parser_region.add_argument('--method', type = str, help = "Must be one of Larson (gaussian), Poisson, or bootstrap. Default = Poisson",
             default = "Poisson")
-    parser_genome.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
-    parser_genome.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
-    parser_genome.add_argument('--filters', type = str, nargs = "+",
+    parser_region.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
+    parser_region.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
+    parser_region.add_argument('--filters', type = str, nargs = "+",
             help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'avg_cov'. Default = None",
             default = [])
-    parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 20",
+    parser_region.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 20",
             default = 20)
-    parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
+    parser_region.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
-    parser_genome.set_defaults(func=region_main)
+    parser_region.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
+    parser_region.set_defaults(func=region_main)
 
     args = parser.parse_args()
     args.func(args)
