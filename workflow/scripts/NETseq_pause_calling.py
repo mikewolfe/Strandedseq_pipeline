@@ -6,18 +6,53 @@ import multiprocessing as mp
 import sys
 
 class GenomicWindow(object):
+    '''
+    Store information about a window in the genome
+
+    Attributes:
+        coord (int): Absolute genomic coordinate of window center
+        window (np.array) : array of int values
+        center_value (int): value at the center of the array
+    '''
     def __init__(self, coord, array):
         self.coord = coord
         self.window = array
         self.center_value = self.window[int(len(array)/2)]
 
     def larson_method(self):
+        """ Calculate rarity of seeing center value 
+        
+        Expects that the values in the window are normally distributed
+
+        Returns:
+            A tuple of information about the test including:
+            coord, coord + 1,
+            center_value, mean of window, stdev of window, pvalue = (1-cdf
+            normal(mean, stdev))
+        """
         mean = np.nanmean(self.window)
         stdev = np.nanstd(self.window)
         pvalue = sci_stats.norm.sf(self.center_value, mean, stdev)
         return(self.coord, self.coord + 1, self.center_value, mean, stdev,  pvalue)
 
     def bootstrap_method(self, n_boot = 10000, rng = np.random.default_rng()):
+        """ Calculate rarity of seeing center value 
+
+        Assumes that the total count of reads is distributed according to a 
+        multinomial under the null.
+
+        Args:
+            n_boot (int): number of random samples from a multinomial to draw
+            rng (np.random.Generator): state needed for random number generation
+
+        Returns:
+            A tuple of information about the test including:
+
+            coord, coord + 1, center_value, expected count, total count in
+            window, total random samples where max in sample >= actual
+            center_value, pvalue = (total_greater_eq + 1) / (n_boot + 1)
+        
+        """
         # get the total number of counts
         total = self.window.sum()
         # redistribute equally using a multinomial for n_boot times
@@ -30,28 +65,87 @@ class GenomicWindow(object):
         return (self.coord, self.coord+1, self.center_value, total/len(self.window), total, total_greater_eq, pvalue)
 
     def poisson_method(self):
+        """ Calculate rarity of seeing center value
+
+        Assumes that the reads are distributed according to a poisson
+        distribution under the null. Lamba is determined as the average read
+        count in the window
+
+        Returns:
+            A tuple of information about the test including:
+
+            coord, coord + 1, center_value, expected count, total count in
+            window, pvalue = 1 - cdf poisson(avg_read_count)
+
+        """
         total = self.window.sum()
         mu = total/len(self.window)
         pvalue = sci_stats.poisson.sf(self.center_value, mu)
         return (self.coord, self.coord+1, self.center_value, mu, total, pvalue)
 
     def max_filter(self):
+        """
+        Tests if the center value of the window is the max of the window
+
+        Returns:
+            True if center value is the max value
+        """
         return self.window.max() <= self.center_value
 
     def coverage_filter(self, cutoff):
+        """
+        Tests if the center value of the window is greater than a cutoff
+
+        Args:
+            cutoff (int): coverage cutoff
+
+        Returns:
+            True if greater than cutoff
+        """
         return self.center_value > cutoff
 
     def avg_coverage_filter(self, cutoff):
+        """
+        Tests if the average value of the window is greater than a
+        cutoff
+
+        Args:
+            cutoff (int): coverage cutoff
+
+        Returns:
+            True if greater than cutoff
+        """
         return np.nanmean(self.window) > cutoff
 
     def zero_filter(self, cutoff):
+        """
+        Tests if the total fraction of zeros is less than a specified
+        cutoff
+
+        Args:
+            cutoff (float): fraction of zeros that is no longer tolerable
+
+        Returns:
+            True if greater than cutoff
+        """
         return np.sum(self.window == 0)/len(self.window) < cutoff
 
 def window_generator(array, wsize, circ = True, offset = 0):
+    """ Take an array and generate windows from it
+
+    Args:
+        array (1D np.array): array to create windows from
+        wsize (int): half the size of the window. Placed on either side of
+                     center
+        circ (bool): Treat the array as circular?
+
+    Yields:
+        GenomicWindow instance
+    """
     # Augment size of the array by going around the horn
     if circ:
         out_array = np.concatenate((array[-wsize:],array,array[:wsize]))
-        # want wsize on either side of the center so need to add one on the left end.
+        # want wsize on either side of the center so need to add one on the right end.
         # This centers the window at center w/ wsize on either side. Total window
         # size should be 2*wsize + 1
         for center in np.arange(wsize,len(array)-wsize+1, 1):
@@ -62,6 +156,17 @@ def window_generator(array, wsize, circ = True, offset = 0):
             yield GenomicWindow(center + offset, out_array[center-wsize:center+wsize+1])
 
 class RegionWindow(object):
+    '''
+    Store information about a region in the genome
+
+    Attributes:
+        chrm (str): chromsome region is on
+        start (int): absolute start coordinate
+        end (int): absolute end coordinate
+        strand (str) : strand of region
+        name (str): name of region
+        array (np.array): array of values for the region
+    '''
     def __init__(self, bed_entry):
         self.chrm = bed_entry["chrm"]
         self.start = bed_entry["start"]
@@ -70,6 +175,12 @@ class RegionWindow(object):
         self.name = bed_entry["name"]
 
     def __iter__(self):
+        """
+        Iterates over the region from start to end.
+
+        Returns:
+            tuple(array index, absolue coordinate, relative coordinate)
+        """
         for index in np.arange(0, len(self.array)):
             if self.strand == "-":
                 rel_coord = len(self.array) - index - 1
@@ -79,9 +190,26 @@ class RegionWindow(object):
             yield((index, abs_coord, rel_coord))
 
     def add_array(self, arrays):
+        """
+        Adds an array to the attributes of the region
+
+        Args:
+            array (np.array): np array of values typically a view
+        """
         self.array = arrays[self.chrm][self.start:self.end]
 
     def larson_method(self):
+        """ Calculate rarity of seeing each value in the region
+        
+        Expects that the values in the region are normally distributed
+
+        Returns:
+            A list of tuples, one for each bp in the region.
+
+            Each tuple is in bed format with extra fields with information about
+            the test. These include relative coordinate, mean, stdev
+            a pvalue (1-cdf normal(mean, stdev))
+        """
         out = []
         mean = np.nanmean(self.array)
         stdev = np.nanstd(self.array)
@@ -92,6 +220,17 @@ class RegionWindow(object):
         return out
 
     def poisson_method(self): 
+        """ Calculate rarity of seeing each value in the region
+        
+        Expects that the values in the region are poisson distributed
+
+        Returns:
+            A list of tuples, one for each bp in the region. 
+
+            Each tuple is in bed format with extra fields with information about
+            the test. These include relative coordinate, poisson mu, and 
+            a pvalue (1-cdf poisson(mu))
+        """
         out = []
         total = self.array.sum()
         mu = total/len(self.array) 
@@ -102,6 +241,19 @@ class RegionWindow(object):
         return out
  
     def bootstrap_method(self, n_boot = 10000, rng = np.random.default_rng()):
+        """ Calculate rarity of seeing each value in the region
+        
+        Expects that the values in the region are randomly distributed 
+        according to a multinomial model
+
+        Returns:
+            A list of tuples, one for each bp in the region.
+
+            Each tuple is in bed format with extra fields with information about
+            the test. These include relative coordinate, exp_count, total
+            bootstrap samples with values >= the bp a pvalue (total_greater
+            + 1 / n_boot + 1)
+        """
         out = []
         # get the total number of counts
         total = self.array.sum()
@@ -115,25 +267,57 @@ class RegionWindow(object):
         return out
 
     def avg_coverage_filter(self, cutoff):
+        """
+        Check if the region passes an average coverage cutoff
+
+        Args:
+            cutoff (float): average the region bust be over
+        Returns:
+            True if region average is > cutoff
+        """
         return np.nanmean(self.array) > cutoff
 
     def zero_filter(self, cutoff):
+        """
+        Check if the region has an acceptable number of zeros
+
+        Args:
+            cutoff (float): fraction of zeros that is no longer acceptable
+        Returns:
+            True if region frac_zeros is < cutoff
+        """
         return np.sum(self.array == 0)/len(self.array) < cutoff
 
 def bed_regions(arrays, bed_object):
+    """ Generate regions using a dictionary of arrays and a bed file
+
+    Args:
+        arrays (dict of 1D np.array): arrays to find regions in
+        bed_object (bed_utils.BedFile): A set of regions
+
+    Yields:
+        RegionWindow instance
+    """
+
     for region in bed_object:
         out = RegionWindow(region)
         out.add_array(arrays)
         yield out
 
 def augment_with_random_state(iterable, starting_seed):
-    return [(entry, np.random.default_rng(starting_seed + index)) for index, entry in enumerate(iterable)]
+    """ Zip an iterator with a np random seed
 
-def region_multiprocess_helper(region, rng):
-    out = []
-    for val in region.poisson_method():
-        out.append(val)
-    return(out)
+    This is needed to ensure that each process does not inherit the same
+    randomstate during multiprocessing
+
+    Args:
+        iterable: anything you need to iterate
+        starting_seed (int): starting seed for the rng
+
+    Returns
+        a list of (rng, iterable)
+    """
+    return [(entry, np.random.default_rng(starting_seed + index)) for index, entry in enumerate(iterable)]
 
 def multiprocess_bootstrap(window, rng):
     return window.bootstrap_method(rng = rng)
@@ -264,7 +448,7 @@ def region_main(args):
     pool.join()
 
     pool = mp.Pool(args.p)
-    output_minus = pool.starmap(region_multiprocess_helper, 
+    output_minus = pool.starmap(methods[args.method], 
                 augment_with_random_state(
                     # super filter goes here. Checks each window to make sure it
                     # passes all filters
@@ -275,6 +459,7 @@ def region_main(args):
     pool.join()
 
     output = [loc for gene in output_plus for loc in gene] + [loc for gene in output_minus for loc in gene]
+    # pvalue is always the last thing in the output of the tests
     pvals = [val[-1] for val in output]
     _, qvals = fdrcorrection(pvals, method = "i")
     for entry, qval in zip(output, qvals):
@@ -303,11 +488,11 @@ if __name__ == "__main__":
     parser_genome.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
     parser_genome.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
     parser_genome.add_argument('--filters', type = str, nargs = "+",
-            help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'max', 'avg_cov'. Default = None",
+            help = "List of filters to apply before considering windows. Possibilities include: 'zero', 'max', 'avg_cov', 'cov'. Default = None",
             default = [])
     parser_genome.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 10",
             default = 10.0)
-    parser_genome.add_argument('--cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 1",
+    parser_genome.add_argument('--cov_cutoff', type = float, help = "Cutoff for center coverage filter. Default = 1",
             default = 1.0)
     parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
