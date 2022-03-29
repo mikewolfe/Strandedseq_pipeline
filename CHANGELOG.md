@@ -6,6 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Develop
-
-- Initial fork from ChIPseq_pipeline (https://github.com/mikewolfe/ChIPseq_pipeline)
-- Some development towards being able to process bisulfite sequencing data
+- Added ability to process coverage in a stranded manner
+- Added support for NET-seq data
+- Added limited support for bisulfite data

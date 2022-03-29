@@ -11,6 +11,7 @@ The goals of this pipeline are to support data from:
 - bisulfite sequencing
 - NET-seq
 - RNA-seq read coverage
+- Any other stranded NGS datatype
 
 This pipeline is focused on:
 
