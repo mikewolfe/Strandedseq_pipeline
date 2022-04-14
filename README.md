@@ -1,4 +1,13 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-≥5.24.2-brightgreen.svg)](https://snakemake.bitbucket.io) [![PEP compatible](http://pepkit.github.io/img/PEP-compatible-green.svg)](http://pepkit.github.io)
+
+# Example pipeline NET-seq on Larson et al. 2014 data 
+
+Note that this is an example pipeline run on a subset of data from the
+Larson et al. 2014 paper
+(http://science.sciencemag.org/content/344/6187/1042). For NETseq
+specific details for this example pipeline checkout
+[NETseq_README.md](NETseq_README.md)
+
 # A portable and reproducible pipeline for analyzing stranded read coverage
 
 The goal of this project is to create a reproducible analysis pipeline for

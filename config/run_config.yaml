@@ -126,6 +126,12 @@ NETseq:
             model_type: "Genomewide"
             wsize: 100
             NETseq_pause_params: "--method bootstrap --alpha 0.05 --filter avg_cov cov --cov_cutoff 1 --avg_cov_cutoff 1"
+        # Negative binomial doesn't seem to call any pauses
+        negBinom_gw:
+            model_type: "Genomewide"
+            wsize: 100
+            # changed alpha to 1 to see how bad the pvalues were
+            NETseq_pause_params: "--method negBinom --alpha 1 --filter avg_cov cov --cov_cutoff 1 --avg_cov_cutoff 1"
         poisson_region:
             model_type: "Region"
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
