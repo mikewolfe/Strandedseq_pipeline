@@ -79,9 +79,9 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
         outval = default 
     else:
         if err:
-            logger.error(err)
+            raise ValueError(err)
         else:
-            logger.error("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
+            raise ValueError("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
     return outval
             
 
@@ -114,15 +114,6 @@ def determine_masked_regions_file(config, genome):
         outfile = None
     return outfile
 
-
-def determine_final_normalization(config):
-    ending = "log2ratio"
-    if "coverage_and_norm" in config and "RobustZ" in config["coverage_and_norm"]:
-        RZ = config["coverage_and_norm"]["RobustZ"]
-        if RZ:
-            ending += "RZ"
-    return ending
-
 def determine_dropNaNsandInfs(config):
     value = lookup_in_config(config, ["coverage_and_norm","dropNaNsandInfs"], True)
     if value:
@@ -148,8 +139,6 @@ def determine_pseudocount(config):
     return pseudocount
     
 RES = lookup_in_config(config, ["coverage_and_norm", "resolution"], 5)
-WITHIN = lookup_in_config(config, ["coverage_and_norm", "within"], "median")
-ENDING = determine_final_normalization(config)
 
 # include in several rules here
 include: "workflow/rules/preprocessing.smk"
@@ -159,6 +148,8 @@ include: "workflow/rules/quality_control.smk"
 include: "workflow/rules/peak_calling.smk"
 include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
+include: "workflow/rules/bisulfite.smk"
+include: "workflow/rules/NETseq.smk"
 
 
 

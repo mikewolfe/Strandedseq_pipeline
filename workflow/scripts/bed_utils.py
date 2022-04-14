@@ -135,6 +135,12 @@ class BedFile(object):
                 gff_entry.end = entry["end"]
                 gff_entry.direction = entry["strand"]
                 outf.write(str(gff_entry)+"\n")
+    def filter_entries(self, bool_func):
+        out = BedFile()
+        for entry in self:
+            if bool_func(entry):
+                out.add_entry(entry)
+        return out
 
 if __name__ == "__main__":
     import sys

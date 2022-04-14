@@ -107,8 +107,10 @@ def Median_norm(arrays, pseudocount = 0):
     one_array = np.hstack(list(arrays.values()))
     one_array += pseudocount
     median = np.nanmedian(one_array)
+    if median == 0:
+        raise ValueError("Median was zero. Consider adding a pseudocount for median calculation")
     for chrm in arrays.keys():
-        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
 
 def smooth(arrays, wsize, kernel_type, edge, sigma = None):
@@ -170,6 +172,8 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
     scale_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
@@ -212,6 +216,8 @@ def scale_max(arrays, num_top, res = 1):
     one_array = one_array[np.isfinite(one_array)]
     ind = np.argpartition(one_array, -num_top//res)[-num_top//res:]
     scale_factor = np.nanmedian(one_array[ind])
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
 
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
@@ -229,6 +235,8 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1, su
         print(region + "\t" + "%s"%val)
     scale_factor = summary_func(vals)
     print("Max val: %s"%scale_factor)
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
