@@ -83,6 +83,49 @@ class GenomicWindow(object):
         pvalue = sci_stats.poisson.sf(self.center_value, mu)
         return (self.coord, self.coord+1, self.center_value, mu, total, pvalue)
 
+
+    def negative_binomial_method(self):
+        """ Calculate rarity of seeing center value
+
+        Assumes that the reads are distributed according to a negative binomial
+        distribution under the null. Scipy parameterizes the negative binomial
+        with p = probability of single success and n = number of successes
+
+        If mean >= variance then:
+            p = mu
+            overdispersion = mu
+        if variance > mean:
+            p = mu/var
+            overdispersion = mu^2 / (var - mu)
+
+        Returns:
+            A tuple of information about the test including:
+
+            coord, coord + 1, center_value, expected count, total count in
+            window, pvalue = 1 - cdf nbinom(p, overdispersion)
+
+        """
+        # Here I am masking the center part of the window to remove the location
+        # under consideration from contributing to background parameter
+        # estimation
+        masked_window = np.ma.masked_array(self.window)
+        masked_window[int(len(self.window)/2)] = np.ma.masked
+        mu = np.nanmean(masked_window)
+        # we are trying to estimate the negative binomial parameters
+        # this is a somewhat poor estimator but will work for our purposes
+        # https://scialert.net/fulltext/?doi=ajms.2010.1.15
+        var = np.nanvar(masked_window)
+        # only defined if var > mu. otherwise we collapse to poisson
+        if var > mu:
+            p = mu/var
+            overdispersion = mu**2 / (var - mu)
+        else:
+            p = mu
+            overdispersion = mu
+        # params for nbinom.sf are value, n, p
+        pvalue = sci_stats.nbinom.sf(self.center_value, overdispersion, p)
+        return (self.coord, self.coord+1, self.center_value, mu, var, pvalue)
+
     def max_filter(self):
         """
         Tests if the center value of the window is the max of the window
@@ -328,6 +371,9 @@ def multiprocess_poisson(window, rng):
 def multiprocess_larson(window, rng):
     return window.larson_method()
 
+def multiprocess_negbinom(window, rng):
+    return window.negative_binomial_method()
+
 def genomewide_main(args):
     
     # read in bw files
@@ -340,11 +386,13 @@ def genomewide_main(args):
     # function factory for different methods
     methods = {'bootstrap': multiprocess_bootstrap,
             'Poisson': multiprocess_poisson,
-            'Larson': multiprocess_larson}
+            'Larson': multiprocess_larson,
+            'negBinom': multiprocess_negbinom}
 
     headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tsamp_gr_eq\tpvalue\tqvalue\n",
                'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tpvalue\tqvalue\n",
-               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tpvalue\tqvalue\n"}
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tpvalue\tqvalue\n",
+               'negBinom': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tvar_count\tpvalue\tqvalue\n" }
 
     # function factory for different filters
     filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
@@ -483,7 +531,7 @@ if __name__ == "__main__":
     parser_genome.add_argument('wsize', type = int, help = "Half the window size. Adds to each side of the query bp. I.e. 100 would give you a \
             total of a 201 bp window with the query bp in the center. Default = 100", default = 100)
     parser_genome.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
-    parser_genome.add_argument('--method', type = str, help = "Must be one of Larson (gaussian), Poisson, or bootstrap. Default = Poisson",
+    parser_genome.add_argument('--method', type = str, help = "Must be one of Larson (gaussian), Poisson, negBinom, or bootstrap. Default = Poisson",
             default = "Poisson")
     parser_genome.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
     parser_genome.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
