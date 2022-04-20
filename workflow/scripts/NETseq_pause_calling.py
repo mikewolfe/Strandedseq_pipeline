@@ -527,7 +527,7 @@ if __name__ == "__main__":
 
     parser_genome = subparsers.add_parser("Genomewide", help = "Call pauses across the entire genome")
     parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
-    parser_genome.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_genome.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the minus strand")
     parser_genome.add_argument('wsize', type = int, help = "Half the window size. Adds to each side of the query bp. I.e. 100 would give you a \
             total of a 201 bp window with the query bp in the center. Default = 100", default = 100)
     parser_genome.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)

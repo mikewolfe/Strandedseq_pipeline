@@ -55,7 +55,7 @@ usage: Python script to call pauses in NET-seq data Genomewide [-h] [--p P] [--m
 
 positional arguments:
   infile_plus           bigwig file containing raw counts on the plus strand
-  infile_minus          bigwig file containing raw counts on the plus strand
+  infile_minus          bigwig file containing raw counts on the minus strand
   wsize                 Half the window size. Adds to each side of the query bp. I.e. 100 would give you a total of a 201 bp window with the query bp
                         in the center. Default = 100
 
@@ -81,15 +81,15 @@ Note the `--filters` option allows you to filter out windows you don’t want to
 test. For example if you wanted to filter out windows that have at least 1 read
 at the center and an average of 1 read across the window you would specify
 `---filter avg_cov cov --cov_cutoff 1 --avg_cov_cutoff 1`. Note that if you do
-not specify the `--filters` option than no filters will be applied.  
+not specify the `--filters` option then no filters will be applied.  
 
 This script depends on additional custom python modules that are in that same
 directory. So if you want to move the script from its location you should just
 copy the whole `workflow/scripts/` directory to ensure that the `bed_utils.py`
 and `bwtools.py` dependencies can be found by the script. Additionally the
-script depends on the `pyBigwig` python module, the `scipy` module, and the
-`numpy` module so you must be working in an environment that has those python
-modules installed.  
+script depends on the `pyBigwig` python module, the `scipy` module, the
+`statsmodels` module, and the `numpy` module so you must be working in an
+environment that has those python modules installed.  
 
 The script takes genomewide `.bw` files as input. These can be easily generated
 from your `.bam` alignment files using the `deeptools` python module. For
@@ -103,7 +103,7 @@ bamCoverage --bam input.bam --outFileName output_minus_strand.bw --outFileFormat
 
 If you were doing paired end data you would want to additionally add a
 `--samFlagInclude 67` to the command to make sure that you don’t count twice
-for each read pair. Additionally if you have a fr-stranded library than the
+for each read pair. Additionally if you have a fr-stranded library then the
 `--filterRNAstrand` flag should just be flipped for each strand. More details
 can be found in the documentation for this tool:
 https://deeptools.readthedocs.io/en/stable/content/tools/bamCoverage.html 
