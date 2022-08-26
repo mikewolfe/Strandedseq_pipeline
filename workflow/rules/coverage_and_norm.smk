@@ -149,6 +149,7 @@ rule deeptools_coverage:
         "--normalizeUsing {wildcards.norm} "
         "--effectiveGenomeSize $(cat {input.genome_size}) "
         "{params.masked_regions} "
+        "{params.strand_param} "
         "{params.bamCoverage_param_string} "
         "> {log.stdout} 2> {log.stderr}"
 
