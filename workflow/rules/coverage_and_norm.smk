@@ -149,6 +149,7 @@ rule deeptools_coverage:
         "--normalizeUsing {wildcards.norm} "
         "--effectiveGenomeSize $(cat {input.genome_size}) "
         "{params.masked_regions} "
+        "{params.strand_param} "
         "{params.bamCoverage_param_string} "
         "> {log.stdout} 2> {log.stderr}"
 
@@ -524,6 +525,31 @@ rule bwtools_ratio:
         "python3 "
         "workflow/scripts/bwtools.py compare {input.ext} {input.inp} {output} "
         "--operation 'divide' "
+        "--res {params.resolution} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
+
+
+rule bwtools_log2strandratio:
+    input:
+        plus = "results/coverage_and_norm/deeptools_coverage/{sample}_plus_raw.bw",
+        minus = "results/coverage_and_norm/deeptools_coverage/{sample}_minus_raw.bw",
+    output:
+        "results/coverage_and_norm/bwtools_compare/{sample}_log2strandratio.bw"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_log2strandratio.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_log2strandratio.err"
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py compare {input.plus} {input.minus} {output} "
+        "--operation 'log2ratio' "
         "--res {params.resolution} "
         "{params.dropNaNsandInfs} "
         "> {log.stdout} 2> {log.stderr}"
