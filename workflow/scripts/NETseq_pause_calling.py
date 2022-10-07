@@ -392,13 +392,22 @@ def genomewide_main(args):
         total_plus = len(output_plus)
         output = output_plus + output_minus
         pvals = [val[-1] for val in output]
-        _, qvals = fdrcorrection(pvals, method = "i")
-        strand = "+"
-        for i, (val, qval) in enumerate(zip(output, qvals)):
-            if i >= total_plus:
-                strand = "-"
-            if qval < args.alpha:
-                sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(chrm, val[0], val[1], val[2],strand, "\t".join([str(entry) for entry in val[3:]]), qval))
+        if args.no_qvalue: 
+            qval = np.nan
+            strand = "+"
+            for i, (val, pval) in enumerate(zip(output, pvals)):
+                if i >= total_plus:
+                    strand = "-"
+                if pval < args.alpha:
+                    sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(chrm, val[0], val[1], val[2],strand, "\t".join([str(entry) for entry in val[3:]]), qval))
+        else:
+            _, qvals = fdrcorrection(pvals, method = "i")
+            strand = "+"
+            for i, (val, qval) in enumerate(zip(output, qvals)):
+                if i >= total_plus:
+                    strand = "-"
+                if qval < args.alpha:
+                    sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(chrm, val[0], val[1], val[2],strand, "\t".join([str(entry) for entry in val[3:]]), qval))
         plus_strand.close()
         minus_strand.close()
 
@@ -461,10 +470,16 @@ def region_main(args):
     output = [loc for gene in output_plus for loc in gene] + [loc for gene in output_minus for loc in gene]
     # pvalue is always the last thing in the output of the tests
     pvals = [val[-1] for val in output]
-    _, qvals = fdrcorrection(pvals, method = "i")
-    for entry, qval in zip(output, qvals):
-        if qval < args.alpha:
-            sys.stdout.write("%s\t%s\n"%("\t".join([str(val) for val in entry]), qval))
+    if args.no_qvalue:
+        qval = np.nan
+        for entry, pval in zip(output, pvals):
+            if pval < args.alpha:
+                sys.stdout.write("%s\t%s\n"%("\t".join([str(val) for val in entry]), qval))
+    else:
+        _, qvals = fdrcorrection(pvals, method = "i")
+        for entry, qval in zip(output, qvals):
+            if qval < args.alpha:
+                sys.stdout.write("%s\t%s\n"%("\t".join([str(val) for val in entry]), qval))
 
     plus_strand.close()
     minus_strand.close()
@@ -499,6 +514,7 @@ if __name__ == "__main__":
     parser_genome.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
             default = True)
     parser_genome.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
+    parser_genome.add_argument('--no_qvalue', type = bool, help = "don't do q-value calculations. Use p-value for sig cutoff")
     parser_genome.set_defaults(func=genomewide_main)
 
 
@@ -519,6 +535,7 @@ if __name__ == "__main__":
     parser_region.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
     parser_region.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
+    parser_region.add_argument('--no_qvalue', action = "store_true", help = "don't do q-value calculations. Use p-value for sig cutoff")
     parser_region.set_defaults(func=region_main)
 
     args = parser.parse_args()
