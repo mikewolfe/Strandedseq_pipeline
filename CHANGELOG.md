@@ -5,9 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Develop
+
+### Added
+- Added a log2 strand bias calculation as a possible coverage track
+- Calculation of the count of fragments for each contig
+
+### Changed
+- Refactored `NETseq_pause_calling.py` for performance boost
+
+### Bug fixes
+- Fixed issue with `workflow/rules/coverage_and_norm.smk` extending reads for
+  non-paired end samples
+- Fixed issue with `multiqc` report not properly reporting pre and post trim
+  fastqc reports
+
 ## 0.0.2
-- Fixed bug preventing stranded coverage under some normalization schemes
+
+### Added
 - Add ability to get combined annotation table and bed for genome annotations
+
+### Bug fixes
+- Fixed bug preventing stranded coverage under some normalization schemes
 
 ## 0.0.1
 - Added ability to process coverage in a stranded manner
