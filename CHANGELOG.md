@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a log2 strand bias calculation as a possible coverage track
 - Calculation of the count of fragments for each contig
+- Allow two separate cutadapt runs to occur
 
 ### Changed
 - Refactored `NETseq_pause_calling.py` for performance boost
