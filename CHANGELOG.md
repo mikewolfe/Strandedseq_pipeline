@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calculation of the count of fragments for each contig
 - Allow two separate cutadapt runs to occur
 - Added a rule to generate annotation files easily with `run_annotations`
+- Added the ability to specify relative coordinates in `bwtools_query`
 
 ### Changed
 - Refactored `NETseq_pause_calling.py` for performance boost
