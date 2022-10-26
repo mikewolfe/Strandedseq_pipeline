@@ -166,6 +166,7 @@ rule bwtools_query:
         res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "res"], 5),
         summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summarize"], 'single'),
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
+        coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "coord"], 'absolute'),
         frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25)
     threads:
         5
@@ -177,6 +178,7 @@ rule bwtools_query:
         "{input.inbws} "
         "--res {params.res} "
         "--regions {input.inbed} "
+        "--coords {params.coord} "
         "--upstream {params.upstream} "
         "--downstream {params.downstream} "
         "--samp_names {params.labels} "

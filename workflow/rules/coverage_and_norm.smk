@@ -550,6 +550,7 @@ rule bwtools_log2strandratio:
         "python3 "
         "workflow/scripts/bwtools.py compare {input.plus} {input.minus} {output} "
         "--operation 'log2ratio' "
+        "--pseudocount 1 "
         "--res {params.resolution} "
         "{params.dropNaNsandInfs} "
         "> {log.stdout} 2> {log.stderr}"
