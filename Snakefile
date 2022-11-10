@@ -150,6 +150,8 @@ include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/bisulfite.smk"
 include: "workflow/rules/NETseq.smk"
+include: "workflow/rules/motif_calling.smk"
+include: "workflow/rules/modeling.smk"
 
 
 

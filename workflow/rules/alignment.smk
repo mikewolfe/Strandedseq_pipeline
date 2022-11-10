@@ -122,6 +122,21 @@ rule combine_beds:
          "results/alignment/combine_bed/{wildcards.genome}/{wildcards.genome} "
          "{input} > {log.stdout} 2> {log.stderr}"
 
+rule combine_gffs:
+    message: "Generating gff for genome {wildcards.genome}"
+    input:
+        lambda wildcards: get_genome_annotations(config, wildcards.genome, ext = "gff")
+    output:
+        "results/alignment/combine_gff/{genome}/{genome}.gff",
+    log:
+        stdout="results/alignment/logs/combine_gff/{genome}/{genome}.log",
+        stderr="results/alignment/logs/combine_gff/{genome}/{genome}.err"
+    threads: 1
+    shell:
+         "for file in {input};"
+         "do cat ${{file}} | tail -n+2 >> {output};"
+         "done"
+
 rule get_annotation_table:
     input:
         lambda wildcards: get_genome_annotations(config, wildcards.genome, ext = "tsv")

@@ -174,19 +174,28 @@ def out_bed(gb, features = ["CDS"], chrm = None, qual_names = ["locus_tag"]):
             outstr += str(convert_strandval(feature.location.strand)) + "\n"
             sys.stdout.write(outstr)
 
-def convert_qualifiers_to_string(qualifiers_dict):
+def convert_string_to_url(string):
+    string = string.replace(",", "%2C")
+    string = string.replace("=", "%3D")
+    string = string.replace(";", "%3B")
+    return string
+def convert_qualifiers_to_string(qualifiers_dict, ignore_list = ["translation"]):
     outstr = ""
     for key in qualifiers_dict:
-        outstr += "%s=%s;"%(key, ",".join(qualifiers_dict[key]))
+        if key in ignore_list:
+            continue
+        outstr += "%s=%s;"%(convert_string_to_url(key.lower()), convert_string_to_url("%2C".join(qualifiers_dict[key])))
     return outstr[:-1]
 
 
-def out_gff(gb, features = ["CDS"], chrm = None):
+def out_gff(gb, features = ["CDS"], chrm = None, qual_names = ["locus_tag"]):
     if chrm:
         name = str(chrm)
     else:
         name = str(gb.name)
     sys.stdout.write("#gff-version 3\n")
+
+    gff_name = set()
     for feature in gb.features:
         if feature.type in features:
             # skip features with partial ends
@@ -195,16 +204,29 @@ def out_gff(gb, features = ["CDS"], chrm = None):
             outstr = ""
             outstr += name + "\t"
             outstr += "." + "\t"
-            # we are not doing heiarchical relationships here so skip
-            # type
-            outstr += "." + "\t"
+            # we are not doing heiarchical relationships here so we will just
+            # set all types to "gene"
+            outstr += "gene" + "\t"
             # gffs are in 1-based format
             outstr += str(feature.location.start + 1) + "\t"
             outstr += str(feature.location.end) + "\t"
+            # often times things need a gene name, thus will replace with locus tag or
+            # if that doesn't exist. NA_number
+            unique_name = check_qualifiers(feature, qual_names)
+            num = 1
+            id_name = unique_name
+            while id_name in gff_name:
+                id_name = unique_name + "_%d"%(num)
+                num += 1
+            gff_name.add(id_name)
             outstr += "." + "\t"
             outstr += str(convert_strandval(feature.location.strand)) + "\t"
             outstr += "." + "\t"
-            # get all qualifiers
+            # get unique ID first. This is chrm + id_name
+            outstr += "ID=%s_%s;"%(name,id_name)
+            # make name same as ID. Important for when combining gffs
+            outstr += "Name=%s;"%(id_name)
+            # get all other qualifiers
             outstr += convert_qualifiers_to_string(feature.qualifiers) + "\n"
             sys.stdout.write(outstr)
 
@@ -292,7 +314,7 @@ if __name__ == "__main__":
     elif ftype == "ptt" or ftype == "rnt":
         out_ptt_rnt(gb, ftype, chrm = chrm, qual_names = qual_name)
     elif ftype == "gff":
-        out_gff(gb, features, chrm = chrm)
+        out_gff(gb, features, chrm = chrm, qual_names = qual_name)
     elif ftype == "fna":
         out_fna(gb, chrm = chrm)
     elif ftype == "tsv":

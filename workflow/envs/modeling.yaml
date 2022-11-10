@@ -1,0 +1,7 @@
+channels:
+    - conda-forge
+    - bioconda
+dependencies:
+    - r-tidyverse >=1.3
+    - bioconductor-deseq2
+    - bioconductor-biocparallel
