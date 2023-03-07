@@ -176,6 +176,64 @@ def bootstrap_method(window, wsize, rng, n_boot = 10000):
     pvalue = (total_greater_eq + 1)/ (n_boot + 1)
     return [loc, loc+1, center_value, total/arr_size, total, total_greater_eq, pvalue]
 
+def gini_coefficient(data, unbiased = False):
+    '''
+    Calculate the gini coefficient for a 1D set of data
+    Arguments:
+        data - 1D numpy array of data
+        unbiased - boolean to determine if unbiased estimator should be used
+    References:
+        https://en.wikipedia.org/wiki/Gini_coefficient
+        https://www.statsdirect.com/help/nonparametric_methods/gini_coefficient.htm
+        https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python
+    Formula:
+        Standard:
+        $G = \frac{1}{n} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+        Unbiased:                                                                
+        $G = \frac{1}{n-1} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+    '''
+    data_sorted = np.sort(data)
+    n = len(data)
+    # the sum of the cumulative sum vector gives the numerator when the data
+    # is sorted in ascending order. The float here prevents integer overflows
+    cumulative = np.cumsum(data_sorted, dtype = float)
+    # the last value in a cumulative vector is the total sum
+    stat = (n + 1 - 2 * np.sum(cumulative)/ cumulative[-1])
+    if unbiased:
+        stat = stat/(n-1)
+    else:
+        stat = stat/n
+    return stat
+
+def gini_boot_method(window, wsize, rng, n_boot = 10000):
+    loc, array = window
+    stat = gini_coefficient(array)
+    boot = sci_stats.bootstrap((array,), gini_coefficient, method = 'percentile',
+            vectorized = False, n_resamples = n_boot)
+    num_zeros = np.count_nonzero(array==0)
+    return [loc, loc+1, stat, boot.standard_error, boot.confidence_interval[0], boot.confidence_interval[1], num_zeros]
+
+def stat_bootstrapped(array, true_val, stat_func, rng, n_boot=1000, alpha = 0.05):
+    total = int(np.sum(array))
+    arr_size = len(array)
+    sample_data = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+    samples = np.apply_along_axis(stat_func, 1, sample_data)
+    total_greater_eq = np.sum(samples >= true_val)
+    median_boot = np.median(samples)
+    low, high  = np.quantile(samples, [alpha, 1-alpha])
+    stdev_boot = np.std(samples)
+    pvalue = (total_greater_eq +1)/(n_boot + 1)
+    return [median_boot, stdev_boot, low, high, pvalue]
+
+
+def gini_null_method(window, wsize, rng, n_boot = 10000):
+    loc, array = window
+    stat = gini_coefficient(array)
+    median_boot, stdev_boot, low, high, pvalue = stat_bootstrapped(array, stat, gini_coefficient, rng, n_boot)
+    num_zeros = np.count_nonzero(array==0)
+    return [loc, loc+1, stat, median_boot, stdev_boot, low, high, pvalue, num_zeros]
+
+
 class RegionWindow(object):
     '''
     Store information about a region in the genome
@@ -383,6 +441,72 @@ def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
 
     return output
 
+def genomewide_gini(args):
+
+    # read in bw files
+    plus_strand = bwtools.pyBigWig.open(args.infile_plus)
+    minus_strand = bwtools.pyBigWig.open(args.infile_minus)
+
+    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
+    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
+    
+    # initialize filters for which locations to consider
+    starting_filters= {'+' : {}, '-' : {}}
+
+    if args.regions is not None:
+        for chrm, array in arrays_plus.items():
+            starting_filters['+'][chrm] = np.zeros(len(array), dtype = bool)
+        for chrm, array in arrays_minus.items():
+            starting_filters['-'][chrm] = np.zeros(len(array), dtype = bool)
+        import bed_utils
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(args.regions) 
+        for entry in inbed:
+            if entry['strand'] == "-":
+                starting_filters[entry['strand']][entry['chrm']][entry['end']:entry['start']:-args.resolution] = True
+            else:
+                starting_filters[entry['strand']][entry['chrm']][entry['start']:entry['end']:args.resolution] = True
+    else:
+        for chrm, array in arrays_plus.items():
+            starting_filters['+'][chrm] = np.ones(len(array), dtype = bool)
+        for chrm, array in arrays_minus.items():
+            starting_filters['-'][chrm] = np.ones(len(array), dtype = bool)
+
+    # function factory for different methods
+    methods = {'Gini_boot': gini_boot_method,
+               'Gini_null': gini_null_method}
+
+    # function factory for different filters
+    filters = {'zero': lambda arr: zero_filter(arr, args.wsize, args.zero_cutoff),
+               'avg_cov': lambda arr: avg_coverage_filter(arr, args.wsize, args.avg_cov_cutoff),
+               'cov': lambda arr: coverage_filter(arr, args.wsize, args.cov_cutoff),
+               'max': lambda arr: max_filter(arr, args.wsize),
+               'local_max': lambda arr: local_max_filter(arr, args.wsize)}
+
+    # combine the filters into a filter list
+    if len(args.filters) > 0:
+        all_filters = [filters[val] for val in args.filters]
+    else:
+        all_filters = [lambda arr: True]
+    
+    output_plus = run_tests_over_strand(arrays_plus, methods, all_filters, starting_filters['+'], args)
+    output_minus = run_tests_over_strand(arrays_minus, methods, all_filters, starting_filters['-'], args)
+
+    total_plus = len(output_plus)
+    output = output_plus + output_minus
+    headers = {'Gini_boot': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tboot_stderr\tboot_low\tboot_hi\tnumzeros\n",
+               'Gini_null': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tnull_median\tnull_stdev\tnull_low\tnull_high\tpvalue\tnumzeros\n"}
+    sys.stdout.write(headers[args.method])
+    for i, val in enumerate(output):
+        if i >= total_plus:
+            strand = "-"
+        else:
+            strand = "+"
+        sys.stdout.write("%s\t%s\t%s\t.\t.\t%s\t%s\n"%(val[0], val[1], val[2], strand, "\t".join([str(entry) for entry in val[3:]])))
+    plus_strand.close()
+    minus_strand.close()
+
+
 def genomewide_fast(args):
     
     # read in bw files
@@ -540,6 +664,33 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser("Python script to call pauses in NET-seq data")
     subparsers = parser.add_subparsers(help = "Supported Commands")
+
+    parser_gini = subparsers.add_parser("Genomewide_gini", help = "Test for uneveness in read distribution")
+    parser_gini.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_gini.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the minus strand")
+    parser_gini.add_argument('wsize', type = int, help = "Half the window size. Adds to each side of the query bp. I.e. 100 would give you a \
+            total of a 201 bp window with the query bp in the center. Default = 100", default = 100)
+    parser_gini.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
+    parser_gini.add_argument('--method', type = str, help = "Must be one of Gini_boot (bootstrap the Gini estimate) or Gini_null (bootstrap a null multinomial distro). Default = Gini_null",
+            default = "Gini_null")
+    parser_gini.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
+    parser_gini.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
+    parser_gini.add_argument('--filters', type = str, nargs = "+",
+            help = "List of filters to apply before considering windows. Possibilities include: 'zero'- max fraction of zeros in window, 'max',\
+                    'avg_cov'-window must be above an avg coverage, 'cov'-center of window must be above cutoff, 'local_max'- coverage must be higher than neighbors. Default = None",
+            default = [])
+    parser_gini.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 1",
+            default = 1.0)
+    parser_gini.add_argument('--cov_cutoff', type = float, help = "Cutoff for center coverage filter. Default = 1",
+            default = 1.0)
+    parser_gini.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
+            default = 0.1)
+    parser_gini.add_argument('--regions', type = str, help = "Regions to only consider. Ignore anything outside these regions. Default = None",
+            default = None)
+    parser_gini.add_argument('--resolution', type = int, help = "Roll the windows at what resolution? Default = 1 bp ", default = 1)
+    parser_gini.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
+            default = True)
+    parser_gini.set_defaults(func=genomewide_gini)
 
     parser_genome = subparsers.add_parser("Genomewide", help = "Call pauses across the entire genome")
     parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
