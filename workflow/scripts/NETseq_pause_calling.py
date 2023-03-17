@@ -221,9 +221,9 @@ def stat_bootstrapped(array, true_val, stat_func, rng, n_boot=1000, alpha = 0.05
     total_greater_eq = np.sum(samples >= true_val)
     median_boot = np.median(samples)
     low, high  = np.quantile(samples, [alpha, 1-alpha])
-    stdev_boot = np.std(samples)
+    mad_boot = sci_stats.median_abs_deviation(samples)
     pvalue = (total_greater_eq +1)/(n_boot + 1)
-    return [median_boot, stdev_boot, low, high, pvalue]
+    return [median_boot, mad_boot, low, high, pvalue]
 
 
 def stat_bootstrapped_compare(array, true_val, stat_func, compare_func, rng, n_boot=1000, alpha = 0.05):
@@ -234,26 +234,26 @@ def stat_bootstrapped_compare(array, true_val, stat_func, compare_func, rng, n_b
     compared_samples = compare_func(true_val, samples)
     median_boot = np.median(samples)
     low, high  = np.quantile(samples, [alpha, 1-alpha])
-    stdev_boot = np.std(samples)
+    mad_boot = sci_stats.median_abs_deviation(samples)
     median_compare = np.median(compared_samples)
     low_compare, high_compare = np.quantile(compared_samples, [alpha, 1-alpha])
-    stdev_compare = np.std(compared_samples)
-    return [median_boot, stdev_boot, low, high, median_compare, stdev_compare, low_compare, high_compare]
+    mad_compare = sci_stats.median_abs_deviation(compared_samples)
+    return [median_boot, mad_boot, low, high, median_compare, mad_compare, low_compare, high_compare]
 
 
 def gini_null_method(window, wsize, rng, n_boot = 10000):
     loc, array = window
     stat = gini_coefficient(array)
-    median_boot, stdev_boot, low, high, pvalue = stat_bootstrapped(array, stat, gini_coefficient, rng, n_boot)
+    median_boot, mad_boot, low, high, pvalue = stat_bootstrapped(array, stat, gini_coefficient, rng, n_boot)
     num_zeros = np.count_nonzero(array==0)
-    return [loc, loc+1, stat, median_boot, stdev_boot, low, high, pvalue, num_zeros]
+    return [loc, loc+1, stat, median_boot, mad_boot, low, high, pvalue, num_zeros]
 
 def gini_null_ratio_method(window, wsize, rng, n_boot = 10000):
     loc, array = window
     stat = gini_coefficient(array)
-    median_boot, stdev_boot, low, high, median_compare, stdev_compare, low_compare, high_compare = stat_bootstrapped_compare(array, stat, gini_coefficient, np.divide, rng, n_boot)
+    median_boot, mad_boot, low, high, median_compare, mad_compare, low_compare, high_compare = stat_bootstrapped_compare(array, stat, gini_coefficient, np.divide, rng, n_boot)
     num_zeros = np.count_nonzero(array==0)
-    return [loc, loc+1, stat, median_boot, stdev_boot, low, high, median_compare, stdev_compare, low_compare, high_compare, num_zeros]
+    return [loc, loc+1, stat, median_boot, mad_boot, low, high, median_compare, mad_compare, low_compare, high_compare, num_zeros]
 
 
 class RegionWindow(object):
@@ -485,7 +485,8 @@ def genomewide_gini(args):
         inbed.from_bed_file(args.regions) 
         for entry in inbed:
             if entry['strand'] == "-":
-                starting_filters[entry['strand']][entry['chrm']][entry['end']:entry['start']:-args.resolution] = True
+                # have to subtract one because of weirdness with the indices
+                starting_filters[entry['strand']][entry['chrm']][(entry['end']-1):(entry['start']-1):-args.resolution] = True
             else:
                 starting_filters[entry['strand']][entry['chrm']][entry['start']:entry['end']:args.resolution] = True
     else:
@@ -518,8 +519,8 @@ def genomewide_gini(args):
     total_plus = len(output_plus)
     output = output_plus + output_minus
     headers = {'Gini_boot': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tboot_stderr\tboot_low\tboot_hi\tnumzeros\n",
-               'Gini_null': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tnull_median\tnull_stdev\tnull_low\tnull_high\tpvalue\tnumzeros\n",
-               'Gini_null_ratio': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tnull_median\tnull_stdev\tnull_low\tnull_high\tratio_median\tratio_stdev\tratio_low\tratio_high\tnumzeros\n"}
+               'Gini_null': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tnull_median\tnull_mad\tnull_low\tnull_high\tpvalue\tnumzeros\n",
+               'Gini_null_ratio': "#chrm\tstart\tend\tname\tvalue\tstrand\tGini\tnull_median\tnull_mad\tnull_low\tnull_high\tratio_median\tratio_mad\tratio_low\tratio_high\tnumzeros\n"}
     sys.stdout.write(headers[args.method])
     for i, val in enumerate(output):
         if i >= total_plus:
