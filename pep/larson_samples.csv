@@ -1,3 +1,9 @@
-sample_name,filenameR1,filenameR2,file_path,input_sample,genome,library_type,seq_method,BCM
-Larson_WT_NETseq,SRR1232430.fastq.gz,,raw_data/raw_fastqs/," ",U00096.3,rf-stranded,NET_seq,-BCM
-Larson_BCM_NETseq,SRR1232434.fastq.gz,,raw_data/raw_fastqs/," ",U00096.3,rf-stranded,NET_seq,+BCM
+sample_name,filenameR1,filenameR2,file_path,input_sample,genome,library_type,seq_method,BCM,genotype
+Larson_WT_NETseq,SRR1232430.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,-BCM,WT
+Larson_BCM_NETseq,SRR1232434.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,+BCM,WT
+Larson_greA_NETseq,SRR1232431.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,-BCM,ΔgreA
+Larson_greB_NETseq,SRR1232432.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,-BCM,ΔgreB
+Larson_greAgreB_NETseq,SRR1232433.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,-BCM,ΔgreAΔgreB
+Larson_lacZBCM_NETseq,SRR1232435.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,+BCM,WT
+Larson_WT_RNAseq,SRR1232436.fastq.gz,,raw_data/raw_fastqs/, ,U00096.3,rf-stranded,NET_seq,-BCM,WT
+Larson_Bsub_NETseq,SRR1232437.fastq.gz,,raw_data/raw_fastqs/, ,AL009126.3,rf-stranded,NET_seq,-BCM,WT
