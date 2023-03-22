@@ -173,16 +173,17 @@ postprocessing:
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            coord: "relative_start"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_plus_raw.bw"
             # how many bp upstream (5') of a feature to include
-            upstream: 0
+            upstream: 200
             # how many bp downstream (3') of a feature to include
             downstream: 0
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
@@ -196,13 +197,14 @@ postprocessing:
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_minus_raw.bw"
+            coord: "relative_start"
             # how many bp upstream (5') of a feature to include
-            upstream: 0
+            upstream: 200
             # how many bp downstream (3') of a feature to include
             downstream: 0
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"

@@ -165,8 +165,10 @@ rule bwtools_query:
         downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "downstream"], 0),
         res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "res"], 5),
         summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summarize"], 'single'),
+        coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "coord"], 'absolute'),
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
-        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25)
+        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25),
+        bwtools_query_params = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "bwtools_query_params"], " ")
     threads:
         5
     conda:
@@ -177,6 +179,7 @@ rule bwtools_query:
         "{input.inbws} "
         "--res {params.res} "
         "--regions {input.inbed} "
+        "--coords {params.coord} "
         "--upstream {params.upstream} "
         "--downstream {params.downstream} "
         "--samp_names {params.labels} "
@@ -184,6 +187,7 @@ rule bwtools_query:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "--gzip "
+        "{params.bwtools_query_params} "
         "> {log.stdout} 2> {log.stderr} "
 
 rule spearman_per_gene:
