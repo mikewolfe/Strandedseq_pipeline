@@ -101,7 +101,7 @@ rule NETseq_pause_seqs:
         1
     shell:
         "zcat {input.bed} | python3 workflow/scripts/pull_seq_from_bed.py - {input.fasta} "
-        "--upstream {params.upstream} --downstream {params.downstream} "
+        "--upstream {params.upstream} --downstream {params.downstream} --circular "
         " 2> {log.stderr} | gzip >  {output}"
 
 rule NETseq_pause_logo:

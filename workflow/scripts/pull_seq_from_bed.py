@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser.add_argument('fasta_file', type=str, help = "fasta file to pull sequences from")
     parser.add_argument('--upstream', type=int, help = "amount upstream to pad sequence by. Default = 0", default = 0)
     parser.add_argument('--downstream', type=int, help = "amount downstream to pad sequence by. Default = 0", default = 0)
+    parser.add_argument('--circular', action = "store_true", help = "treat chromosomes as circular?")
 
     args = parser.parse_args()
     bed_file = args.bed_file
@@ -41,6 +42,6 @@ if __name__ == "__main__":
             this_end = this_end + downstream 
             rc = False
         chrm = genome.pull_entry(this_chrm)
-        seq = chrm.pull_seq(this_start, this_end, rc = rc)
+        seq = chrm.pull_seq(this_start, this_end, rc = rc, circ = args.circular)
         sys.stdout.write(seq + "\n")
 

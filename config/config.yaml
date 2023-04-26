@@ -45,6 +45,11 @@ preprocessing:
     cutadapt_pe:
         cut_param_string:
             value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+        # some stranded sequence libraries require two cutting steps in this
+        # case we needed to remove the last five bases of R1 and the first five
+        # bases of R2 after cutting the adaptors off
+        cut2_param_string:
+            value: "-u -5 -U 5"
     # Control the parameter string from trimmomatic
     trimmomatic_pe:
         trim_param_string:
@@ -97,7 +102,7 @@ coverage_and_norm:
         bamCoverage_param_string:
             # Want only the 5' end of the read (which is really the
             # 3' end of the NET-seq read)
-            value: "--samFlagInclude 67 --Offset 1"
+            column: "bamCoverage_params"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.
@@ -164,14 +169,14 @@ coverage_and_norm:
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
         # how many regions to look at?
         number_of_regions:
-            value: 20
+            value: 10
     bwtools_query_scale:
         # What regions to consider for a max scaling
         query_regions:
             value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
         # How many regions to look at for max scaling
         number_of_regions:
-            value: 20
+            value: 10
 
     bwtools_multicompare:
         # Run these models by doing `snakemake --use-conda --cores
@@ -221,6 +226,24 @@ coverage_and_norm:
 quality_control:
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
+    # control how reads are filter for ALL samples
+    bamCoverage_params: " " 
+    # Determine sampling parameters for fingerprint plots. These are good
+    # defaults for E. coli
+    plotFingerprint:
+        binsize: 500
+        num_samps: 9200
+    # Determine bin size for coverage calcs. This controls PCA and correlation
+    # as well
+    multiBamSummary:
+        binsize: 1000
+    # Determine sampling parameters for coverage calculations
+    plotCoverage:
+        num_samps: 1000
+    bamPEFragSize:
+        bin_dist: 10000
+
+
 
 # Options to control peak calling
 peak_calling:
@@ -254,6 +277,37 @@ peak_calling:
         # automatically determined.
         macs2_param_string: 
             column: macs2_params
+
+# Options to control motif calling
+# run with run_motif_calling
+motif_calling:
+    # Can make different models to try out different motif callers or params
+    macs2_all:
+        # Which motif caller? Supports meme and streme
+        motif_caller: "streme"
+        # Which samples to run on?
+        filter: 'not input_sample.isnull()'
+        # Which file to run on?
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        # Parameters for the background markov model
+        get_markov_param_string:
+            value: "-dna -m 2"
+        # Parameters for the streme motif caller
+        streme_param_string:
+            value: "--dna --minw 8 --maxw 30 --nmotifs 2"
+        # Parameters controlling how the sequences are pulled from the bed
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
+
+    # Same thing but running a different motif finder
+    macs2_all_meme:
+        motif_caller: "meme"
+        filter: 'not input_sample.isnull()'
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        get_markov_param_string:
+            value: "-dna -m 0"
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:
@@ -302,7 +356,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_minus_median_ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_minus_median_ratio_querysub.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -327,7 +381,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio_querysub_queryscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio_querysub.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
@@ -385,3 +439,47 @@ postprocessing:
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 
+        # Model 6 - look at the average strand ratio at each gene
+        all_genes_mean_strand_ratio:
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            filter: "input_sample.isnull() or not input_sample.isnull()"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "mean"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+# Control for NETseq submodule
+NETseq:
+    pause_calling:
+        test:
+            model_type: "Genomewide"
+            NETseq_pause_params: "--method Larson --circular True --filter cov --cov_cutoff 1"
+            filter: "seq_method == 'NETseq'"
+            wsize: 100
+
+# Control for the modeling submodule
+modeling:
+    # Specify a specific model you want to run
+    by_condition:
+        # Which samples?
+        filter: "not input_sample.isnull()"
+        # How should HTseq count features?
+        HTseq_params: "-s reverse -a 0 -i ID -t gene"
+        # Which features should be counted?
+        regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
+        # Whats the full model?
+        full: "~ genotype"
+        # Whats the reduced model?
+        reduced: "~ 1"

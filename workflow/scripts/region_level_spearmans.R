@@ -5,7 +5,7 @@ suppressMessages(library(tidyverse))
 # regions
 
 spearman_per_region <- function(d){
-    samples <- colnames(d %>% select(-c(region,coord)))
+    samples <- colnames(d %>% select(-c(chrm, region,coord)))
     out <- list()
     k <- 1
     # do every combination of samples only once
@@ -18,8 +18,10 @@ spearman_per_region <- function(d){
             # use syntax to get past tidy_eval issues
             samp1 <- samples[[i]]
             samp2 <- samples[[j]]
-            out[[k]] <- d %>% group_by(region) %>%
-                    summarize(cor = cor(!!sym(samp1), !!sym(samp2), method = "sp"),
+            print(samp1)
+            print(samp2)
+            out[[k]] <- d %>% group_by(chrm, region) %>%
+                    summarize(cor = cor(!!sym(samp1), !!sym(samp2), method = "sp", use = "na.or.complete"),
                               samp1 = samples[[i]],
                               samp2 = samples[[j]],
                               avg_samp1 = mean(!!sym(samp1), na.rm = TRUE),
@@ -34,7 +36,7 @@ spearman_per_region <- function(d){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-ind <- read_tsv(args[1])
+ind <- read_tsv(args[1], na = "nan") %>% mutate(across(-c(chrm,region, coord), as.numeric))
 
 out <- spearman_per_region(ind)
 

@@ -5,16 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Develop
+## 0.0.3
 
 ### Added
 - Added a log2 strand bias calculation as a possible coverage track
 - Calculation of the count of fragments for each contig
-- Allow two separate cutadapt runs to occur
+- Allow two separate cutadapt runs to occur for sequencing kits that require
+  sequential trimming
 - Added a rule to generate annotation files easily with `run_annotations`
 - Added the ability to specify relative coordinates in `bwtools_query`
 - Unstranded Peak calling and motif calling
 - Modeling module with DESeq2 and stranded feature quant with HTseq-count
+- Ability to better set parameters for ChIP QC in config file
 
 ### Changed
 - Refactored `NETseq_pause_calling.py` for performance boost
@@ -24,6 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-paired end samples
 - Fixed issue with `multiqc` report not properly reporting pre and post trim
   fastqc reports
+- Fixed issue with bamPEFragmentSize would attempt to run on single end data
+- Fixed issue with trimmomatic not properly running for single end data
+- Fixed issue with spearman correlation calculations failing on updated coverage
+  files from bwtools
+- Fixed issue with NETseq pause calling failing when NaNs were present in data
+  by coercing all NaNs to zeros
+- Fixed issue where pulling sequences from bed files near genome boundaries
+  would fail. Updated to consider all chromosomes as circular.
+- Fixed an issue where NETseq logos would display information content on
+  a non-standard scale. Fixed scaling to be 0 to 2.0 bits
+- Fixed an issue where numpy deprecations impact deeptools quality control. Set
+  a lower version of numpy in environment files for quality control
 
 ## 0.0.2
 

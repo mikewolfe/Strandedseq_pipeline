@@ -143,7 +143,7 @@ rule trimmomatic_se:
         stdout="results/preprocessing/logs/trimmomatic_se/{sample}_trim.log",
         stderr="results/preprocessing/logs/trimmomatic_se/{sample}_trim.err"
     shell:
-       "trimmomatic SE -phred33 {input.in1} "
+       "trimmomatic SE -phred33 {input.in1} {output} "
        "{params.trim_param_string} > {log.stdout} 2> {log.stderr}"
 
 rule trimmomatic_pe:
