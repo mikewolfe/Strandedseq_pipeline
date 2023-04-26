@@ -389,8 +389,8 @@ def genomewide_fast(args):
     plus_strand = bwtools.pyBigWig.open(args.infile_plus)
     minus_strand = bwtools.pyBigWig.open(args.infile_minus)
 
-    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
-    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
+    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1, nan_to_zero = True)
+    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1, nan_to_zero = True)
     
     # initialize filters for which locations to consider
     starting_filters= {'+' : {}, '-' : {}}
@@ -471,8 +471,8 @@ def region_main(args):
     plus_strand = bwtools.pyBigWig.open(args.infile_plus)
     minus_strand = bwtools.pyBigWig.open(args.infile_minus)
 
-    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1)
-    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1)
+    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1, nan_to_zero = True)
+    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1, nan_to_zero = True)
 
     # function factory for different methods
     methods = {'bootstrap': multiprocess_bootstrap,

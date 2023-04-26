@@ -34,7 +34,7 @@ def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandI
             outf.addEntries(names[the_finite], starts[the_finite], 
                     ends = ends[the_finite], values=this_array[the_finite])
 
-def bigwig_to_arrays(bw, res = None):
+def bigwig_to_arrays(bw, res = None, nan_to_zero = False):
     """
     Convert a bigwig to a dictionary of numpy arrays, one entry per contig
     
@@ -46,11 +46,11 @@ def bigwig_to_arrays(bw, res = None):
     """
     arrays = {}
     for chrm in bw.chroms().keys():
-        arrays[chrm] = contig_to_array(bw, chrm, res)
+        arrays[chrm] = contig_to_array(bw, chrm, res, nan_to_zero = nan_to_zero)
     return arrays
 
 
-def contig_to_array(bw, chrm, res = None):
+def contig_to_array(bw, chrm, res = None, nan_to_zero = False):
     """
     Convert single basepair bigwig information to a numpy array
     
@@ -69,6 +69,8 @@ def contig_to_array(bw, chrm, res = None):
     out_array = bw.values(chrm, 0, chrm_length, numpy=True)
     if res:
         out_array = out_array[::res]
+    if nan_to_zero:
+        out_array[np.isnan(out_array)] = 0
     return out_array
 
 
