@@ -6,3 +6,5 @@ dependencies:
     - scipy>=1.5.2
     - statsmodels
     - deeptools>=3.5.1
+    - pandas
+    - scikit-learn

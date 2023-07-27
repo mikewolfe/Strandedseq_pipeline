@@ -7,4 +7,4 @@ genotypeB_rep1_ext,genotypeB_rep1_ext_R1.fastq.gz,genotypeB_rep1_ext_R2.fastq.gz
 genotypeB_rep2_ext,genotypeB_rep2_ext_R1.fastq.gz,genotypeB_rep2_ext_R2.fastq.gz,source1,genotypeB_rep2_inp,B,U00096.3,rf-stranded,--samFlagInclude 67 --extendReads,-f BAMPE,
 genotypeB_rep1_inp,genotypeB_rep1_inp_R1.fastq.gz,genotypeB_rep1_inp_R2.fastq.gz,source1,,B,U00096.3,rf-stranded,--samFlagInclude 67 --extendReads,,
 genotypeB_rep2_inp,genotypeB_rep2_inp_R1.fastq.gz,genotypeB_rep2_inp_R2.fastq.gz,source1,,B,U00096.3,rf-stranded,--samFlagInclude 67 --extendReads,,
-genotypeA_rep2_ext_se,genotypeA_rep2_ext_R1.fastq.gz,,source1,genotypeA_rep2_inp,A,U00096.3,rf-stranded, --Offset 1,-f BAM,NETseq
+genotypeA_rep2_ext_se,genotypeA_rep2_ext_R1.fastq.gz,,source1,,A,U00096.3,rf-stranded, --Offset 1,-f BAM,NETseq

@@ -174,7 +174,7 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
     scale_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
-    if scale_factor == 0:
+    if scale_val == 0:
         raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
@@ -261,7 +261,8 @@ def manipulate_main(args):
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
-            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge)}
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
+            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount) }
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -588,6 +589,319 @@ def multicompare_main(args):
             res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     close_multiple_bigwigs(groupA_handles)
 
+def single_num_summary(arrays, function, contigs = None):
+    if contigs is None:
+        contigs = arrays.keys()
+    out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
+    i = 0
+    for chrm in contigs:
+        arrsize = arrays[chrm].size
+        out_array[i:i+arrsize] = arrays[chrm][:]
+        i = i + arrsize
+    return function(out_array)
+
+def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = None):
+    if contigs is None:
+        contigs = arrays_plus.keys()
+    out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
+    i = 0
+    for chrm in contigs:
+        arrsize = arrays_plus[chrm].size
+        out_array[i:i+arrsize] = arrays_plus[chrm][:]
+        i = i + arrsize
+    for chrm in contigs:
+        arrsize = arrays_minus[chrm].size
+        out_array[i:i+arrsize] = arrays_minus[chrm][:]
+        i = i + arrsize
+
+    return function(out_array)
+
+def geometric_mean(arrays, axis = 0, pseudocount = 1.0):
+    arrays = [np.log(array + pseudocount) for array in arrays]
+    return np.exp(np.nanmean(arrays, axis=axis))
+
+def add_pseudocount(array, pseudocount):
+    out_array = {}
+    for chrm in array.keys():
+        out_array[chrm] = array[chrm] + pseudocount
+    return out_array
+
+def scale_array(array, scale_factor, pseudocount):
+    if scale_factor == 0 or scale_factor is None:
+        raise ValueError("Scale factor value was zero or undefined.")
+    out_array = {}
+    for chrm in array.keys():
+        out_array[chrm] = (array[chrm] + pseudocount)/scale_factor
+    return out_array
+
+def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
+    import pandas as pd
+
+    sf_table = pd.read_csv(scalefactor_table, sep = "\t")
+    scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
+    return scale_array(array, scale_factor, pseudocount)
+
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res):
+    import bed_utils
+    from sklearn.linear_model import LinearRegression
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(expected_locs)
+    mask_array = {}
+    for contig in spike_contigs:
+        mask_array[contig] = np.ones(len(ext_array[contig]), bool)
+    for region in inbed:
+        if region["chrm"] in spike_contigs:
+            mask_array[region["chrm"]][region["start"]//res:region["end"]//res] = 0
+    
+
+    # concatenate all locations where enrichment is not expected into a single array
+    X = []
+    y = []
+    for contig in spike_contigs:
+        y.append(ext_array[contig][mask_array[contig]])
+        X.append(input_array[contig][mask_array[contig]])
+
+    y = np.concatenate(y)
+    X = np.concatenate(X)
+
+    # fit input vs. extracted
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(X), np.isfinite(y))
+    y = y[remove_nansandinfs].reshape(-1,1)
+    X = X[remove_nansandinfs].reshape(-1,1)
+    reg = LinearRegression(fit_intercept = False).fit(X,y)
+    regress_slope = reg.coef_[0,0]
+    
+    # predict expected bound regions using input 
+    full_X = []
+    full_y = []
+    for contig in spike_contigs:
+        full_y.append(ext_array[contig][~mask_array[contig]])
+        full_X.append(input_array[contig][~mask_array[contig]])
+
+    full_y = np.concatenate(full_y)
+    full_X = np.concatenate(full_X)
+
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
+    # get residuals
+    resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
+    
+
+    # get sum of positive residuals and return
+    resids[resids < 0] = 0
+    return np.mean(resids)
+
+
+def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res):
+    import bed_utils
+    from sklearn.linear_model import LinearRegression
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(expected_locs)
+    mask_array = {"-" : {}, "+" : {}}
+    for contig in spike_contigs:
+        mask_array["-"][contig] = np.ones(len(ext_array_plus[contig]), bool)
+        mask_array["+"][contig] = np.ones(len(ext_array_minus[contig]), bool)
+    for region in inbed:
+        strand = region["strand"]
+        if region["chrm"] in spike_contigs:
+            if strand == "-":
+                mask_array["-"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
+            elif strand == "." or strand == "+":
+                mask_array["+"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
+
+    
+
+    # concatenate all locations where enrichment is not expected into a single array
+    X = []
+    y = []
+    for contig in spike_contigs:
+        y.append(ext_array_plus[contig][mask_array["+"][contig]])
+        y.append(ext_array_minus[contig][mask_array["-"][contig]])
+        X.append(inp_array_plus[contig][mask_array["+"][contig]])
+        X.append(inp_array_minus[contig][mask_array["-"][contig]])
+
+    y = np.concatenate(y)
+    X = np.concatenate(X)
+
+    # fit input vs. extracted
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(X), np.isfinite(y))
+    y = y[remove_nansandinfs].reshape(-1,1)
+    X = X[remove_nansandinfs].reshape(-1,1)
+    reg = LinearRegression(fit_intercept = False).fit(X,y)
+    regress_slope = reg.coef_[0,0]
+    
+    # predict expected bound regions using input 
+    full_X = []
+    full_y = []
+    for contig in spike_contigs:
+        full_y.append(ext_array_plus[contig][~mask_array["+"][contig]])
+        full_y.append(ext_array_minus[contig][~mask_array["-"][contig]])
+        full_X.append(inp_array_plus[contig][~mask_array["+"][contig]])
+        full_X.append(inp_array_minus[contig][~mask_array["-"][contig]])
+
+    full_y = np.concatenate(full_y)
+    full_X = np.concatenate(full_X)
+
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
+    # get residuals
+    resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
+    
+
+    # get sum of positive residuals and return
+    resids[resids < 0] = 0
+    return np.mean(resids)
+
+
+
+def normfactor_main(args):
+    import pandas as pd 
+
+    frag_table = pd.read_csv(args.fragCountTable, sep = "\t")
+    md = pd.read_csv(args.metaDataTable)
+
+    # get the total number of frags per each sample
+    overall = frag_table.assign(total_frag = \
+            lambda x: x.groupby(["sample_name"])['fragments']\
+            .transform(lambda x: x.sum()))\
+    .drop(["contig","fragments"], axis=1)\
+    .drop_duplicates()
+    total_frag_sf_column = pd.DataFrame(data = {'total_frag_sfs': overall["total_frag"]/np.mean(overall["total_frag"]), 'sample_name': overall["sample_name"]})
+    overall = overall.merge(total_frag_sf_column, on = 'sample_name', how = 'left')
+
+
+    if args.spikecontigs is not None:
+        # spike fragments
+        spike_frags = frag_table[frag_table["contig"].isin(args.spikecontigs)].assign(spike_frag = \
+                lambda x: x.groupby(["sample_name"])['fragments']\
+                .transform(lambda x: x.sum()))\
+        .drop(["contig","fragments"], axis=1)\
+        .drop_duplicates()
+    
+        overall = overall.merge(spike_frags, on='sample_name', how = 'left')
+        overall = overall.assign(nonspike_frag = overall['total_frag'] - overall['spike_frag'])
+
+        spike_frag_sf_column = pd.DataFrame(data = {'spike_frag_sfs': overall["spike_frag"]/np.mean(overall["spike_frag"]), 'sample_name': overall["sample_name"]})
+        nonspike_frag_sf_column = pd.DataFrame(data = {'nonspike_frag_sfs': overall["nonspike_frag"]/np.mean(overall["nonspike_frag"]), 'sample_name': overall["sample_name"]})
+
+        overall = overall.merge(spike_frag_sf_column, on = 'sample_name', how = 'left')
+        overall = overall.merge(nonspike_frag_sf_column, on = 'sample_name', how = 'left')
+
+    print(overall)
+    # DEseq2 size factors
+    # stranded version
+    if args.ext_bws_minus is not None:
+        bw_plus_handles = open_multiple_bigwigs(args.ext_bws)
+        bw_plus_arrays = convert_bigwigs_to_arrays(bw_plus_handles, res = args.res)
+
+        bw_minus_handles = open_multiple_bigwigs(args.ext_bws_minus)
+        bw_minus_arrays = convert_bigwigs_to_arrays(bw_minus_handles, res = args.res)
+
+        geom_means_plus = multicompare_within_group(bw_plus_arrays, lambda x, axis: geometric_mean(x, axis, pseudocount = args.pseudocount))
+        geom_means_minus = multicompare_within_group(bw_minus_arrays, lambda x, axis: geometric_mean(x, axis, pseudocount = args.pseudocount))
+        deseq2_sfs = []
+        for array_plus, array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, args.samples):
+            compared_minus = compare_divide(add_pseudocount(array_minus, args.pseudocount), geom_means_minus)
+            compared_plus = compare_divide(add_pseudocount(array_plus, args.pseudocount), geom_means_plus)
+            deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian))
+
+        deseq2_column = pd.DataFrame(data = {'deseq2_sfs': deseq2_sfs, 'sample_name': args.samples})
+        overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+    # unstranded version
+    else:
+        bw_handles = open_multiple_bigwigs(args.ext_bws)
+        bw_arrays = convert_bigwigs_to_arrays(bw_handles, res = args.res)
+        geom_means = multicompare_within_group(bw_arrays, lambda x, axis: geometric_mean(x, axis, pseudocount = args.pseudocount))
+        deseq2_sfs = []
+        for array, sample in zip(bw_arrays, args.samples):
+            deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian))
+        deseq2_column = pd.DataFrame(data = {'deseq2_sfs': deseq2_sfs, 'sample_name': args.samples})
+        overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+
+    # DEseq2 size factors spike-in only
+    if args.spikecontigs is not None:
+    
+        # stranded version
+        if args.ext_bws_minus is not None:
+
+            deseq2_sfs = []
+            for array_plus, array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, args.samples):
+                compared_minus = compare_divide(add_pseudocount(array_minus, args.pseudocount), geom_means_minus)
+                compared_plus = compare_divide(add_pseudocount(array_plus, args.pseudocount), geom_means_plus)
+                deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian, contigs = args.spikecontigs))
+
+            deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
+            overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+        # unstranded version
+        else:
+            deseq2_sfs = []
+            for array, sample in zip(bw_arrays, args.samples):
+                deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, contigs = args.spikecontigs))
+            deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
+            overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+
+
+    # enrichment based
+    if args.spikecontigs is not None:
+        # stranded version
+        if args.ext_bws_minus is not None:
+            inp_plus_bw_handles = open_multiple_bigwigs(args.inp_bws)
+            inp_plus_bw_arrays = convert_bigwigs_to_arrays(inp_plus_bw_handles, res = args.res)
+
+            inp_minus_bw_handles = open_multiple_bigwigs(args.inp_bws_minus)
+            inp_minus_bw_arrays = convert_bigwigs_to_arrays(inp_minus_bw_handles, res = args.res)
+            regress_resids = []
+            regress_rpm = []
+            for ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, inp_plus_bw_arrays, inp_minus_bw_arrays, args.samples):
+                regress_resids.append(get_stranded_regression_estimates(\
+                        scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0], args.pseudocount),\
+                        scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0], args.pseudocount),\
+                        scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag_sfs"].values[0], args.pseudocount),\
+                        scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag_sfs"].values[0], args.pseudocount),\
+                        args.spikecontigs,
+                        args.expected_regions,
+                        args.res))
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+            regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
+            regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': regress_resids/np.mean(regress_resids)*regress_rpm, 'sample_name': args.samples})
+    
+            overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+        # unstranded version
+        else:
+            inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
+            inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
+            regress_resids = []
+            regress_rpm = []
+            for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
+                regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0], args.pseudocount),\
+                        scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag_sfs"].values[0], args.pseudocount),\
+                        args.spikecontigs,
+                        args.expected_regions,
+                        args.res))
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+            regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
+            regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': regress_resids/np.mean(regress_resids)*regress_rpm, 'sample_name': args.samples})
+    
+            overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+
+    overall.to_csv(args.outfile, index = False, sep = "\t", float_format='%.4f')
+    
+    if args.ext_bws_minus is not None: 
+        close_multiple_bigwigs(bw_plus_handles)
+        close_multiple_bigwigs(bw_minus_handles)
+        close_multiple_bigwigs(inp_minus_bw_handles)
+        close_multiple_bigwigs(inp_plus_bw_handles)
+    else:
+        close_multiple_bigwigs(bw_handles)
+        close_multiple_bigwigs(inp_bw_handles)
  
 if __name__ == "__main__":
     import argparse
@@ -606,7 +920,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth' 'scale_byfactor'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -615,9 +929,9 @@ if __name__ == "__main__":
             help = "number of regions to include in background or max")
     parser_manipulate.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
-    parser_manipulate.add_argument('--pseudocount', default = 0, type = int,
+    parser_manipulate.add_argument('--pseudocount', default = 0, type = float,
             help = "Add value to all unmasked regions before normalization. Only\
-                    applicable to the median normalization. Default = 0 ")
+                    applicable to the median and scale_byfactor normalization. Default = 0 ")
     parser_manipulate.add_argument('--summary_func', default = "mean", type = str,
             help = "For methods that use regions. What summary function do you want to use over \
                     said regions. Options: mean, median, sum \
@@ -636,6 +950,10 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
+    parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
+            help = "A table of scale factors for scale_byfactor")
+    parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,
+            help = "The sample and scale factor to choose from the table")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 
@@ -708,6 +1026,29 @@ if __name__ == "__main__":
     parser_multicompare.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
     parser_multicompare.set_defaults(func=multicompare_main)
+
+    # normfactor verb
+    parser_normfactor = subparsers.add_parser("normfactor", help = "Calculate normalization factors based on spike-ins or internal controls")
+    parser_normfactor.add_argument("outfile", type=str, help = "file to output to")
+    parser_normfactor.add_argument("fragCountTable", type = str, help = "table of fragment counts per contig for each sample")
+    parser_normfactor.add_argument("metaDataTable", type = str, help = "table of sample relationships")
+    parser_normfactor.add_argument("--ext_bws", type=str, nargs ="+", help = "extracted raw counts per region")
+    parser_normfactor.add_argument("--ext_bws_minus", type=str, nargs ="+", help = "extracted raw counts per region for minus strand")
+    parser_normfactor.add_argument("--inp_bws", type=str, nargs ="+", help = "input raw counts per region")
+    parser_normfactor.add_argument("--inp_bws_minus", type=str, nargs ="+", help = "input raw counts per region for minus strand")
+    parser_normfactor.add_argument("--samples", type=str, nargs ="+", help = "sample names to determine size factors for. Should match extracted bws")
+    parser_normfactor.add_argument("--spikecontigs", type=str, nargs ="+", help = "sample names to determine size factors for. Should match extracted bws")
+    parser_normfactor.add_argument('--pseudocount', default = 1, type = float,
+            help = "Add value to all unmasked regions before ratio calculations. \
+                    Default = 1 ")
+    parser_normfactor.add_argument('--expected_regions', type = str, help = "bed file of regions where signal is expected")
+    parser_normfactor.add_argument('--res', type=int, default=1,
+            help="Resolution to compute statistics at. Default 1bp. Note this \
+            should be set no lower than the resolution of the input file")
+    parser_normfactor.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output bigwig")
+    parser_normfactor.set_defaults(func=normfactor_main)
+
     
     args = parser.parse_args()
     args.func(args) 
