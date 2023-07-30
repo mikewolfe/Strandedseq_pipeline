@@ -285,13 +285,18 @@ def read_multiple_bws(bw_files, res = 1):
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
     return (all_bws, open_fhandles)
 
-def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False, coord = "absolute"):
-    outvalues = {fname: [] for fname in args.infiles}
+def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False, coord = "absolute", minus_bws = None, samp_to_fname_minus = None, antisense = False):
+    if minus_bws is not None:
+        stranded = True
+    else:
+        stranded = False
+    outvalues = {samp: [] for samp in samp_names}
     region_names = []
     coordinates = []
     chrm_names = []
     for region in inbed:
-        for fname in args.infiles:
+        for samp in samp_names:
+            fname = samp_to_fname[samp]
             these_arrays = all_bws[fname]
             array_len = len(these_arrays[region["chrm"]])
             if region["strand"] == "-":
@@ -300,9 +305,17 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
             else:
                 left_coord = max(region["start"] - args.upstream, 0)
                 right_coord = min(region["end"] + args.downstream, array_len * res)
-    
-            these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
-            outvalues[fname].extend(these_values)
+            if stranded:
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                    minus_fname = samp_to_fname_minus[samp]
+                    these_minus_arrays = minus_bws[minus_fname]
+                    these_values = these_minus_arrays[region["chrm"]][left_coord//res:right_coord//res]
+                else:
+                    these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
+            else:
+                these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
+
+            outvalues[samp].extend(these_values)
         these_coordinates = np.arange((left_coord//res)*res,\
                 (right_coord//res)*res, res)
         if coord == "relative_start":
@@ -330,7 +343,7 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
         chrm_names.extend([region["chrm"]]*len(these_coordinates))
 
     header = "chrm\tregion\tcoord\t%s"%("\t".join(samp_names)) + "\n"
-    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    values_func = lambda i: "\t".join([str(outvalues[samp][i]) for samp in samp_names])
     if gzip:
         with gzip.open(args.outfile, mode = "wb") as outf:
             outf.write(header.encode())
@@ -360,12 +373,17 @@ def summit_loc(array, res, wsize, upstream):
     return loc*res - upstream
 
 
-def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
-    outvalues = {fname: [] for fname in args.infiles}
+def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False, minus_bws = None, samp_to_fname_minus = None, antisense = False):
+    if minus_bws is not None:
+        stranded = True
+    else:
+        stranded = False
+    outvalues = {samp: [] for samp in samp_names}
     region_names = []
     chrm_names = []
     for region in inbed:
-        for fname in args.infiles:
+        for samp in samp_names:
+            fname = samp_to_fname[samp]
             these_arrays = all_bws[fname]
             array_len = len(these_arrays[region["chrm"]])
             if region["strand"] == "-":
@@ -374,22 +392,31 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
             else:
                 left_coord = max(region["start"] - args.upstream, 0)
                 right_coord = min(region["end"] + args.downstream, array_len * res)
+
+            if stranded:
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                    minus_fname = samp_to_fname_minus[samp]
+                    these_minus_arrays = minus_bws[minus_fname]
+                    these_values = these_minus_arrays[region["chrm"]][left_coord//res:right_coord//res]
+                else:
+                    these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
+            else:
+                these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
     
-            these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
             # add a filter for regions that have high amounts of nans
             if (np.sum(np.isnan(these_values)) / len(these_values)) < frac_na:
-                if region["strand"] == "-":
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
                     this_summary = summary_func(these_values[::-1])
                 else:
                     this_summary = summary_func(these_values)
             else:
                 this_summary = np.nan
-            outvalues[fname].append(this_summary)
+            outvalues[samp].append(this_summary)
         region_names.append(region["name"])
         chrm_names.append(region["chrm"])
 
     header = "chrm\tregion\t%s"%("\t".join(samp_names)) + "\n"
-    values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
+    values_func = lambda i: "\t".join([str(outvalues[samp][i]) for samp in samp_names])
     if gzip:
         with gzip.open(args.outfile, mode = "wb") as outf:
             outf.write(header.encode())
@@ -972,6 +999,8 @@ if __name__ == "__main__":
     parser_query = subparsers.add_parser("query", help = "Lookup values in BigWig files")
     parser_query.add_argument("outfile", type=str, help = "file to output to")
     parser_query.add_argument("infiles", nargs = "+", type=str, help = "input files")
+    parser_query.add_argument("--minus_strand", nargs = "+", type = str, help = "minus strand files for stranded data")
+    parser_query.add_argument("--antisense", type = bool, help = "compute antisense instead of sense values for each region")
     parser_query.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")

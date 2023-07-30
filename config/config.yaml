@@ -348,7 +348,7 @@ variant_calling:
 # Control for the postprocessing submodule
 postprocessing:
     # summarizes values by region
-    bwtools_query:
+    bwtools_query_stranded:
         # Can specify different "models" to run by naming them here
         # Model 1 - look at the full coverage for all genes
         all_genes_cov:
@@ -358,7 +358,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
@@ -378,7 +378,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_minus_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -403,7 +403,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
@@ -423,7 +423,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_minus_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
@@ -446,7 +446,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_plus_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
@@ -460,27 +460,27 @@ postprocessing:
             summary_func: "TR"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
-
-        # Model 6 - look at the average strand ratio at each gene
-        all_genes_mean_strand_ratio:
-            # which regions to use?
-            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
-            # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
-            # what resolution to query data (shouldn't be lower than the
-            # resolution of your file, think of this as a sampling rate, no 
-            # averaging is done over the bins)
-            res : 5
-            # How do you want to summarize your data? (identity gives every data
-            # point in tidy format, single allows for a single number summary)
-            summarize: "single"
-            filter: "input_sample.isnull() or not input_sample.isnull()"
-            # What single number summary do you want (mean, median, max, min,
-            # etc.)
-            # only defined when summarize is "single"
-            summary_func: "mean"
-            # what fraction of NaNs can be in a region and still report a value?
-            frac_na: 0.20
+    bwtools_query:
+         # Model 6 - look at the average strand ratio at each gene
+         all_genes_mean_strand_ratio:
+             # which regions to use?
+             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+             # which files to use? Note we can use a different set than Model 1
+             filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
+             # what resolution to query data (shouldn't be lower than the
+             # resolution of your file, think of this as a sampling rate, no 
+             # averaging is done over the bins)
+             res : 5
+             # How do you want to summarize your data? (identity gives every data
+             # point in tidy format, single allows for a single number summary)
+             summarize: "single"
+             filter: "input_sample.isnull() or not input_sample.isnull()"
+             # What single number summary do you want (mean, median, max, min,
+             # etc.)
+             # only defined when summarize is "single"
+             summary_func: "mean"
+             # what fraction of NaNs can be in a region and still report a value?
+             frac_na: 0.20
 
 # Control for NETseq submodule
 NETseq:
