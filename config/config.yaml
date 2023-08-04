@@ -282,23 +282,6 @@ quality_control:
 # Options to control peak calling
 peak_calling:
     # Can make different models to try out different peak callers or parameters
-    cmarrt_all:
-        # specify the peak caller to use. Currently only support "cmarrt" and "macs2"
-        peak_caller: "cmarrt"
-        # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
-        # Choose which coverage file you want to run the peak caller on
-        filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
-        # Window size is required for cmarrt
-        # Half the size of the window in *entries* thus this would be 25
-        # * 5 bp resolution for a half window size of 125 bp
-        cmarrt_window_size:
-            value: 25
-        # Additional parameters to the calling function can be specified here
-        # Number of entries to consolidate peaks over i.e. two peaks within
-        # 10 * 5bp = 50 bp will get merged into one peak.
-        cmarrt_param_string:
-            value:  "--consolidate 10 --plots"
     macs2_all:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
