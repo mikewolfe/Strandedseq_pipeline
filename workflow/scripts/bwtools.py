@@ -668,17 +668,20 @@ def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
     scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
     return scale_array(array, scale_factor, pseudocount)
 
+
 def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res):
     import bed_utils
     from sklearn.linear_model import LinearRegression
-    inbed = bed_utils.BedFile()
-    inbed.from_bed_file(expected_locs)
+    if expected_locs is not None:
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
     mask_array = {}
     for contig in spike_contigs:
         mask_array[contig] = np.ones(len(ext_array[contig]), bool)
-    for region in inbed:
-        if region["chrm"] in spike_contigs:
-            mask_array[region["chrm"]][region["start"]//res:region["end"]//res] = 0
+    if expected_locs is not None:
+        for region in inbed:
+            if region["chrm"] in spike_contigs:
+                mask_array[region["chrm"]][region["start"]//res:region["end"]//res] = 0
     
 
     # concatenate all locations where enrichment is not expected into a single array
@@ -698,44 +701,49 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     X = X[remove_nansandinfs].reshape(-1,1)
     reg = LinearRegression(fit_intercept = False).fit(X,y)
     regress_slope = reg.coef_[0,0]
-    
+
     # predict expected bound regions using input 
+    if expected_locs is not None:
+        new_mask_array = {contig: ~mask_array[contig] for contig in mask_array}
+    else:
+        new_mask_array = mask_array
     full_X = []
     full_y = []
     for contig in spike_contigs:
-        full_y.append(ext_array[contig][~mask_array[contig]])
-        full_X.append(input_array[contig][~mask_array[contig]])
+        full_y.append(ext_array[contig][new_mask_array[contig]])
+        full_X.append(input_array[contig][new_mask_array[contig]])
 
     full_y = np.concatenate(full_y)
     full_X = np.concatenate(full_X)
-
     # make sure there are no NaNs from masked areas
     remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
     # get residuals
     resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
     
-
     # get sum of positive residuals and return
-    resids[resids < 0] = 0
+    if expected_locs is not None:
+        resids[resids < 0] = 0
     return np.mean(resids)
-
 
 def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res):
     import bed_utils
     from sklearn.linear_model import LinearRegression
-    inbed = bed_utils.BedFile()
-    inbed.from_bed_file(expected_locs)
+    if expected_locs is not None:
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
     mask_array = {"-" : {}, "+" : {}}
     for contig in spike_contigs:
         mask_array["-"][contig] = np.ones(len(ext_array_plus[contig]), bool)
         mask_array["+"][contig] = np.ones(len(ext_array_minus[contig]), bool)
-    for region in inbed:
-        strand = region["strand"]
-        if region["chrm"] in spike_contigs:
-            if strand == "-":
-                mask_array["-"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
-            elif strand == "." or strand == "+":
-                mask_array["+"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
+
+    if expected_locs is not None:
+        for region in inbed:
+            strand = region["strand"]
+            if region["chrm"] in spike_contigs:
+                if strand == "-":
+                    mask_array["-"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
+                elif strand == "." or strand == "+":
+                    mask_array["+"][region["chrm"]][region["start"]//res:region["end"]//res] = 0
 
     
 
@@ -762,11 +770,20 @@ def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array
     # predict expected bound regions using input 
     full_X = []
     full_y = []
+
+    if expected_locs is not None:
+        new_mask_array = {"-" : {}, "+" : {}}
+        for strand in ["+", "-"]:
+            new_mask_array[strand] = {contig: ~mask_array[strand][contig] for contig in mask_array[strand]}
+    else:
+        new_mask_array = mask_array
+
+
     for contig in spike_contigs:
-        full_y.append(ext_array_plus[contig][~mask_array["+"][contig]])
-        full_y.append(ext_array_minus[contig][~mask_array["-"][contig]])
-        full_X.append(inp_array_plus[contig][~mask_array["+"][contig]])
-        full_X.append(inp_array_minus[contig][~mask_array["-"][contig]])
+        full_y.append(ext_array_plus[contig][mask_array["+"][contig]])
+        full_y.append(ext_array_minus[contig][mask_array["-"][contig]])
+        full_X.append(inp_array_plus[contig][mask_array["+"][contig]])
+        full_X.append(inp_array_minus[contig][mask_array["-"][contig]])
 
     full_y = np.concatenate(full_y)
     full_X = np.concatenate(full_X)

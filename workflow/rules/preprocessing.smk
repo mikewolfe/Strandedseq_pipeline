@@ -2,6 +2,10 @@
 # samples(pep)
 # lookup_sample_metadata(sample, key, pep)
 
+ruleorder: cutadapt_pe > cutadapt_se
+ruleorder: cutadapt_pe2 > cutadapt_se2
+ruleorder: trimmomatic_pe > trimmomatic_se
+
 rule clean_preprocessing:
     shell:
         "rm -rf results/preprocessing/"

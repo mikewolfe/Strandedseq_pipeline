@@ -152,7 +152,7 @@ rule ChIP_QC:
         expand("results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/corHeatmap/{group}_corHeatmap.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/corScatter/{group}_corScatterplot.png", group = qc_groups(config, pep)),
-        expand("results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.png", group = qc_groups(config, pep)),
+        expand("results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/plotCoverage_rmdups/{group}_plotCoverage_rmdups.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/plotCoverage/{group}_plotCoverage.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/PCA/{group}_plotPCA.png", group = qc_groups(config, pep))
@@ -330,7 +330,7 @@ rule deeptools_QC_bamPEFragmentSize:
         fragment_hist="results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.txt",
         table="results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize_table.txt"
     params:
-        labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
+        labels = lambda wildcards: " ".join([samp for samp in get_pe_samples(pep)]),
         bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_pe_samples(pep)]),
         num_samps = lookup_in_config(config, ["quality_control", "bamPEFragSize", "bin_dist"], 10000),
     threads:
