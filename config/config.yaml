@@ -368,6 +368,31 @@ postprocessing:
             # for summarize "identity". Try to do this on a small number of
             # samples of the same type
             calc_spearman: true
+
+        all_genes_antisense_cov:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+            antisense: True
+            # Calculate spearman correlations between samples? Only make sense
+            # for summarize "identity". Try to do this on a small number of
+            # samples of the same type
+            calc_spearman: true
+
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?
@@ -385,6 +410,27 @@ postprocessing:
             # etc.)
             # only defined when summarize is "single"
             summary_func: "mean"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+
+        all_genes_antisense_mean:
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "mean"
+            antisense: True
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 

@@ -170,6 +170,14 @@ def pull_bws_for_stranded_models(toolname, modelname, config, pep, strand = "plu
 
     return files
 
+def run_antisense(wildcards):
+    if lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "antisense"], False):
+        out = "--antisense"
+    else:
+        out = " "
+    return out
+            
+    
 
 rule bwtools_query_stranded:
     input:
@@ -190,7 +198,7 @@ rule bwtools_query_stranded:
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "summary_func"], 'mean'),
         coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "coord"], 'absolute'),
         frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "frac_na"], 0.25),
-        antisense = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "antisense"], False)
+        antisense = lambda wildcards: run_antisense(wildcards)
     threads:
         5
     conda:
@@ -210,7 +218,7 @@ rule bwtools_query_stranded:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "--gzip "
-        "--antisense {params.antisense} "
+        "{params.antisense} "
         "> {log.stdout} 2> {log.stderr} "
 
 

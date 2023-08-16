@@ -448,6 +448,17 @@ def query_main(args):
         samp_to_fname = {fname : fname for fname in args.infiles}
         samp_names = args.infiles
 
+    if args.minus_strand:
+        if len(args.minus_strand) != len(args.infiles):
+            raise ValueError("Amount of files for plus and minus strand do not match. Need one file for each strand")
+        if args.samp_names is None or len(args.samp_names) != len(args.infiles):
+            raise ValueError("Need to give one sample name for each file in stranded analyses")
+        all_minus_bws, open_minus_fhandles = read_multiple_bws(args.minus_strand, res = res)
+        minus_stfn = {samp_name : fname for fname, samp_name in zip(args.minus_strand, args.samp_names)}
+    else:
+        all_minus_bws = None
+        minus_stfn = None
+
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
@@ -461,8 +472,12 @@ def query_main(args):
     except KeyError:
         KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
-    overall_funcs = {'identity' : lambda bws, names, smtofn, bed, res, gzip: query_summarize_identity(bws, names, smtofn, bed, res, gzip, args.coords),
-        'single' : lambda bws, names, smtofn, bed, res, gzip: query_summarize_single(bws, names, smtofn, bed,res, summary_func, args.frac_na, gzip)}
+    overall_funcs = {'identity' : lambda bws, names, smtofn, bed, res, gzip: \
+            query_summarize_identity(bws, names, smtofn, bed, res, gzip, \
+            args.coords, all_minus_bws, minus_stfn, args.antisense),
+        'single' : lambda bws, names, smtofn, bed, res, gzip: \
+                query_summarize_single(bws, names, smtofn, bed, res, \
+                summary_func, args.frac_na, gzip, all_minus_bws, minus_stfn, args.antisense)}
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
@@ -472,6 +487,9 @@ def query_main(args):
     
     for fhandle in open_fhandles:
         fhandle.close()
+    if args.minus_strand:
+        for fhandle in open_minus_fhandles:
+            fhandle.close()
         
 
 def summarize_main(args):
@@ -833,7 +851,6 @@ def normfactor_main(args):
         overall = overall.merge(spike_frag_sf_column, on = 'sample_name', how = 'left')
         overall = overall.merge(nonspike_frag_sf_column, on = 'sample_name', how = 'left')
 
-    print(overall)
     # DEseq2 size factors
     # stranded version
     if args.ext_bws_minus is not None:
@@ -1017,7 +1034,7 @@ if __name__ == "__main__":
     parser_query.add_argument("outfile", type=str, help = "file to output to")
     parser_query.add_argument("infiles", nargs = "+", type=str, help = "input files")
     parser_query.add_argument("--minus_strand", nargs = "+", type = str, help = "minus strand files for stranded data")
-    parser_query.add_argument("--antisense", type = bool, help = "compute antisense instead of sense values for each region")
+    parser_query.add_argument("--antisense", action = "store_true", help = "compute antisense instead of sense values for each region")
     parser_query.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
