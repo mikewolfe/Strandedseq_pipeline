@@ -102,4 +102,4 @@ rule DESeq2_diffexp:
         "Rscript workflow/scripts/DESeq2_diffexp.R {input.metadata} {params.path_to_HTseq_files} "
         "results/modeling/{wildcards.model}/DESeq2/{wildcards.model} "
         "'{params.model_full}' '{params.model_reduced}' {threads} {params.spike_regions}"
-        "> {log.stdout} 2> {log.stderr}"
+        " > {log.stdout} 2> {log.stderr}"
