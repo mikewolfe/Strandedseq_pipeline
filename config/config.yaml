@@ -19,11 +19,14 @@ reference:
             # but you can also add additional contigs that you may want in
             # the final alignment genome by listing them here
             - test/ecoli_rrnD.fa
+            - test/ERCC92.fa
         # This allows you to mask regions by replacing them with Ns. Masked
         # regions need to be specified by a bed file
         masked_regions: test/ecoli_rrns.bed
         beds:
-            - test/ecoli_rrns.bed
+            - test/ERCC92.bed
+        gffs:
+            - test/ERCC92.gtf
 
 # Options to control preprocessing rules
 preprocessing:

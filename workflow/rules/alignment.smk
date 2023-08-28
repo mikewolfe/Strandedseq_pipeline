@@ -26,6 +26,9 @@ def get_genome_annotations(config, genome, ext = "bed"):
     if ext == "bed":
         for val in lookup_in_config(config, ["reference", genome, "beds"]):
             out.append(val)
+    if ext == "gff":
+        for val in lookup_in_config(config, ["reference", genome, "gffs"]):
+            out.append(val)
     return out
 
 def get_bt2_index(sample, pep):
