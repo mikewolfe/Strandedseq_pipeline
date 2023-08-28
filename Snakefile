@@ -151,6 +151,7 @@ include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/bisulfite.smk"
 include: "workflow/rules/NETseq.smk"
 include: "workflow/rules/motif_calling.smk"
+include: "workflow/rules/pseudoalignment.smk"
 include: "workflow/rules/modeling.smk"
 
 

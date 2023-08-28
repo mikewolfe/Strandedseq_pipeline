@@ -6,3 +6,4 @@ dependencies:
     - bioconductor-deseq2
     - bioconductor-biocparallel
     - bioconductor-apeglm
+    - r-sleuth >=0.30.0

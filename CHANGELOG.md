@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- Pseudoalignment with Kallisto for stranded data
+- Modeling with Sleuth
 - Stranded querys with sense and antisense capabilities `bwtools_query_stranded`
 - Stranded spike-in normalization using variety of methods including Bonhoure et
   al. method and DEseq2 method

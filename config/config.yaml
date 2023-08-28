@@ -22,6 +22,8 @@ reference:
         # This allows you to mask regions by replacing them with Ns. Masked
         # regions need to be specified by a bed file
         masked_regions: test/ecoli_rrns.bed
+        beds:
+            - test/ecoli_rrns.bed
 
 # Options to control preprocessing rules
 preprocessing:
@@ -536,12 +538,27 @@ NETseq:
 modeling:
     # Specify a specific model you want to run
     by_condition:
+        # Which modeler
+        program: "DESeq2"
         # Which samples?
         filter: "not input_sample.isnull()"
         # How should HTseq count features?
         HTseq_params: "-s reverse -a 0 -i ID -t gene"
         # Which features should be counted?
         regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
+        # Whats the full model?
+        full: "~ genotype"
+        # Whats the reduced model?
+        reduced: "~ 1"
+
+    by_condition_sleuth:
+        # Which modeler
+        program: "sleuth"
+        genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
+        # Which samples?
+        filter: "not input_sample.isnull()"
+        # Which features should be counted?
+        regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
         # Whats the full model?
         full: "~ genotype"
         # Whats the reduced model?

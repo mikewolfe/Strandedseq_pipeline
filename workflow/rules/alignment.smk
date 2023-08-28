@@ -22,7 +22,10 @@ def get_genome_fastas(config, genome):
 def get_genome_annotations(config, genome, ext = "bed"):
     out = []
     for key in lookup_in_config(config, ["reference", genome, "genbanks"]).keys():
-       out.append("results/alignment/process_genbank/%s/%s.%s"%(genome, key, ext))
+        out.append("results/alignment/process_genbank/%s/%s.%s"%(genome, key, ext))
+    if ext == "bed":
+        for val in lookup_in_config(config, ["reference", genome, "beds"]):
+            out.append(val)
     return out
 
 def get_bt2_index(sample, pep):

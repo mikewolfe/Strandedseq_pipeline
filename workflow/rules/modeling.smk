@@ -2,10 +2,18 @@ rule clean_modeling:
     shell:
         "rm -rf results/modeling/"
 
+
+def determine_modeling_output(config, pep):
+    outstr = "results/modeling/%s/%s/%s.rds"
+    outfiles = []
+    for model in lookup_in_config(config, ['modeling'], {}).keys():
+        program = lookup_in_config(config, ['modeling', model, 'program'], 'sleuth')
+        outfiles.append(outstr%(model, program, model))
+    return outfiles
+
 rule run_modeling:
     input:
-        expand("results/modeling/{model}/DESeq2/{model}.rds", model = lookup_in_config(config, ['modeling'], {}).keys())
-        
+        determine_modeling_output(config, pep) 
 
 def all_htseq_for_modeling(model, config, pep):
     these_samples = filter_samples(pep, \
@@ -103,3 +111,83 @@ rule DESeq2_diffexp:
         "results/modeling/{wildcards.model}/DESeq2/{wildcards.model} "
         "'{params.model_full}' '{params.model_reduced}' {threads} {params.spike_regions}"
         " > {log.stdout} 2> {log.stderr}"
+
+
+def get_all_kallisto_output_dirs(model, config):
+    """
+    Pull all the kallisto paths per sample
+    """
+    samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    out_samples = {}
+    for sample in samples:
+        out_samples[sample] = "results/pseudoalignment/kallisto/%s/%s"%(model,sample)
+    return out_samples
+
+def get_all_kallisto_output_h5s(model, config):
+    """
+    Get all kallisto output h5s
+    """
+    sample_dict = get_all_kallisto_output_dirs(model, config)
+    out_samples = [sample + "/abundance.h5" for sample in sample_dict.values()]
+    return out_samples
+
+
+def create_sleuth_metadata_table(model, config, pep, outfile):
+    """
+    create a metadata table from config file and kallisto paths
+    """
+    paths = get_all_kallisto_output_dirs(model, config)
+    sample_table = pep.sample_table
+    all_keys = list(sample_table.columns)
+    all_keys.remove("sample_name")
+    if "path" in all_keys:
+        all_keys.remove("path")
+    if "sample" in all_keys:
+        all_keys.remove("path")
+    all_samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    # write output to a file
+    with open(outfile, mode = "w") as outf:
+        # header needs sample and kallisto path
+        header = "sample\t" + "\t".join(all_keys) + "\tpath\n"
+        outf.write(header)
+        for sample in all_samples:
+            # for any value that doesn't exist for that sample give an NA
+            values = [str(lookup_sample_metadata(sample, key, pep)) for key in all_keys]
+            line = "%s\t"%(sample) + "\t".join(values) + "\t" + paths[sample] + "\n"
+            outf.write(line)
+
+
+rule sleuth_metadata:
+    message: "Creating metadata table for model {wildcards.model}"
+    input:
+        lambda wildcards: get_all_kallisto_output_h5s(wildcards.model, config)
+    output:
+        "results/modeling/{model}/sleuth/samples.tsv"
+    threads: 1
+    run:
+        create_sleuth_metadata_table(wildcards.model, config, pep, output[0])
+
+rule sleuth_diffexp:
+    message: "Running differential expression for model {wildcards.model}"
+    input: 
+        "results/modeling/{model}/sleuth/samples.tsv"
+    output:
+        model="results/modeling/{model}/sleuth/{model}.rds",
+        lrt="results/modeling/{model}/sleuth/{model}_lrt.tsv",
+        coefficients="results/modeling/{model}/sleuth/{model}_coefficients.tsv",
+        tpm="results/modeling/{model}/sleuth/{model}_normed_tpm.tsv"
+    params:
+        model_full = lambda wildcards: config['modeling'][wildcards.model]['full'],
+        model_reduced = lambda wildcards: config['modeling'][wildcards.model]['reduced']
+    log:
+        stdout="results/modeling/logs/{model}/sleuth_diffexp/{model}.log",
+        stderr="results/modeling/logs/{model}/sleuth_diffexp/{model}.err"
+    threads: 10 
+    conda:
+        "../envs/modeling.yaml"
+    resources:
+        mem_mb=5000
+    shell:
+        "Rscript workflow/scripts/sleuth_diffexp.R {input} results/modeling/{wildcards.model}/sleuth/{wildcards.model} "
+        "'{params.model_full}' '{params.model_reduced}' {threads} "
+        "> {log.stdout} 2> {log.stderr}"
