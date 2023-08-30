@@ -537,6 +537,18 @@ NETseq:
             filter: "seq_method == 'NETseq'"
             wsize: 100
 
+
+# Control for transcriptome assembly
+# WIP
+
+# Control for counting features
+feature_counting:
+    all_genes:
+        # Parameters to pass to HTseq count
+        HTseq_params: "-s reverse -a 0 -i ID -t gene"
+        # Which features should be counted?
+        regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
+
 # Control for the modeling submodule
 modeling:
     # Specify a specific model you want to run
@@ -545,10 +557,8 @@ modeling:
         program: "DESeq2"
         # Which samples?
         filter: "not input_sample.isnull()"
-        # How should HTseq count features?
-        HTseq_params: "-s reverse -a 0 -i ID -t gene"
-        # Which features should be counted?
-        regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
+        # Which quantification:
+        count_path: "results/modeling/feature_counting/all_genes/HTseq_readcount/"
         # Whats the full model?
         full: "~ genotype"
         # Whats the reduced model?
@@ -557,10 +567,10 @@ modeling:
     by_condition_sleuth:
         # Which modeler
         program: "sleuth"
-        genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
         # Which samples?
         filter: "not input_sample.isnull()"
         # Which features should be counted?
+        genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
         regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
         # Whats the full model?
         full: "~ genotype"

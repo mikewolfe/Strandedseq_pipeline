@@ -18,8 +18,8 @@ rule run_modeling:
 def all_htseq_for_modeling(model, config, pep):
     these_samples = filter_samples(pep, \
     lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
-    file_sig = "results/modeling/%s/HTseq_readcount/%s.tsv"
-    files = [file_sig%(model, sample) for sample in these_samples]
+    quant_path = lookup_in_config(config, ["modeling", model, "count_path"]) + "%s.tsv"
+    files = [quant_path%(sample) for sample in these_samples]
     return files
 
 def pull_sample_labels_for_modeling(modelname, config, pep):
@@ -30,14 +30,14 @@ rule HTseq_readcount:
     input:
         inbam = "results/alignment/bowtie2/{sample}_sorted.bam",
         inbam_idx = "results/alignment/bowtie2/{sample}_sorted.bam.bai",
-        ingff= lambda wildcards: lookup_in_config(config, ["modeling", wildcards.model, "regions"])
+        ingff= lambda wildcards: lookup_in_config(config, ["feature_counting", wildcards.model, "regions"])
     output:
-        outtext="results/modeling/{model}/HTseq_readcount/{sample}.tsv"
+        outtext="results/modeling/feature_counting/{model}/HTseq_readcount/{sample}.tsv"
     log:
-        stderr="results/modeling/logs/{model}/HTseq_readcount/{sample}_HTseq_readcount.err"
+        stderr="results/modeling/logs/feature_counting/{model}/HTseq_readcount/{sample}_HTseq_readcount.err"
     params:
         HTseq_params = lambda wildcards: lookup_in_config(config,\
-        ["modeling", wildcards.model, "HTseq_params"],\
+        ["feature_counting", wildcards.model, "HTseq_params"],\
         "-s no -a 0 -t ID")
     conda:
         "../envs/modeling.yaml"
@@ -89,7 +89,8 @@ rule DESeq2_diffexp:
         coefficients="results/modeling/{model}/DESeq2/{model}_coefficients.tsv",
         scaled_count="results/modeling/{model}/DESeq2/{model}_scaledcount.tsv"
     params:
-        path_to_HTseq_files = "results/modeling/{model}/HTseq_readcount",
+        path_to_HTseq_files = lambda wildcards: lookup_in_config(config,\
+        ['modeling', wildcards.model, 'count_path']),
         model_full = lambda wildcards: lookup_in_config(config,\
         ['modeling', wildcards.model, 'full']),
         model_reduced = lambda wildcards: lookup_in_config(config,\
