@@ -36,7 +36,7 @@ rule NETseq_genomewide_pause:
         "results/coverage_and_norm/deeptools_coverage/{sample}_plus_raw.bw",
         "results/coverage_and_norm/deeptools_coverage/{sample}_minus_raw.bw"
     output:
-        "results/NETseq/Genomewide_pause/{model}/{sample}_pause_calls.tsv.gz"
+        "results/NETseq/Genomewide_pause/{model}/{sample}_pause_calls.bed.gz"
     log:
         stderr = "results/NETseq/logs/Genomewide_pause/{sample}_gw_pause_{model}.err"
     params:
@@ -63,7 +63,7 @@ rule NETseq_region_pause_calling:
         lambda wildcards: lookup_in_config(config,["NETseq", "pause_calling", wildcards.model, "regions"])
 
     output:
-        "results/NETseq/Region_pause/{model}/{sample}_pause_calls.tsv.gz"
+        "results/NETseq/Region_pause/{model}/{sample}_pause_calls.bed.gz"
     log:
         stderr = "results/NETseq/logs/Region_pause/{sample}_region_pause_{model}.err"
     params:
