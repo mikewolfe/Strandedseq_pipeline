@@ -8,10 +8,10 @@ def determine_NETseq_pause_output(config, pep):
         lookup_in_config(config, ["NETseq", "pause_calling", model, "filter"], "not sample_name.isnull()"))
         if model_type == "Genomewide":
             for sample in these_samples:
-                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.tsv.gz"%(model_type,model,sample))
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
         elif model_type == "Region":
             for sample in these_samples:
-                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.tsv.gz"%(model_type,model,sample))
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
         else:
             raise ValueError("Model type %s not supported for NETseq pause calling. Need one of Genomewide or Region"%(model_type))
     return outfiles
@@ -19,7 +19,7 @@ def determine_NETseq_pause_output(config, pep):
 def determine_logo_output(config, pep):
     out = []
     for val in determine_NETseq_pause_output(config, pep):
-        out.append(val.replace("pause_calls.tsv.gz", "pause_logo.pdf"))
+        out.append(val.replace("pause_calls.bed.gz", "pause_logo.pdf"))
     return out
         
 
@@ -86,7 +86,7 @@ def find_sample_fasta(sample, pep):
 
 rule NETseq_pause_seqs:
     input:
-        bed = "results/NETseq/{model_type}_pause/{model}/{sample}_pause_calls.tsv.gz",
+        bed = "results/NETseq/{model_type}_pause/{model}/{sample}_pause_calls.bed.gz",
         fasta = lambda wildcards: find_sample_fasta(wildcards.sample, pep)
     output:
         "results/NETseq/{model_type}_pause/{model}/{sample}_pause_seqs.txt.gz"
