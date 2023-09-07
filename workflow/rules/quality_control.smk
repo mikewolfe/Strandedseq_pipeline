@@ -143,7 +143,13 @@ def qc_groups(config, pep):
     return pep.sample_table[column].unique().tolist()
 
 def get_pe_samples(pep):
-    return filter_samples(pep, "not filenameR2.isnull()")
+    out = []
+    for sample in samples(pep):
+        if determine_single_end(sample, pep):
+            continue
+        else:
+            out.append(sample)
+    return out
 
 # OVERALL RULE FOR ChIP QC
 

@@ -17,7 +17,7 @@ def determine_spike_norm_files(config, pep):
     models = lookup_in_config(config, ["coverage_and_norm", "spike_norm"], "")
     for model in models: 
         these_samples = filter_samples(pep, \
-            lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "filter"], "not input_sample.isnull()"))
+            lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "filter"], "not sample_name.isnull()"))
         for norm_type in lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "methods"], []):
             for strand in ["plus", "minus"]:
                 outfiles.extend(["results/coverage_and_norm/spike_norm/%s/%s_%s_%s.bw"%(model, sample, strand, norm_type) for sample in these_samples]) 
@@ -35,7 +35,7 @@ rule get_raw_coverage:
 def raw_or_smoothed(sample, pep, config,strand):
     filtered = filter_samples(pep, \
     lookup_in_config(config, ["coverage_and_norm", "smooth_samples", "filter"], \
-    "not input_sample.isnull() and input_sample.isnull()"))
+    "not sample_name.isnull()"))
     if sample in filtered:
         out = "results/coverage_and_norm/bwtools_smooth/%s_%s_smooth.bw"%(sample,strand)
     else:
@@ -641,7 +641,7 @@ rule run_bwtools_multicompare:
 
 def pull_bws_for_spike_norm_models(modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not sample_name.isnull()"))
     file_sig = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
 
@@ -654,7 +654,7 @@ def pull_bws_for_spike_norm_models(modelname, config, pep, strand = "plus", ext_
 
 def pull_labels_for_spike_norm_models(modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not sample_name.isnull()"))
     return " ".join(these_samples)
 
 

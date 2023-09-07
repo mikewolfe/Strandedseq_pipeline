@@ -5,7 +5,7 @@ def determine_NETseq_pause_output(config, pep):
         model_type = lookup_in_config(config, ["NETseq", "pause_calling", model, "model_type"], 
         err = "Need model type specified for pause_calling model %s in config file. I.e. \nNETseq:\n\tpause_calling:\n\t%s:\n\t\tmodel_type: 'Genomewide'"%(model,model))
         these_samples = filter_samples(pep, \
-        lookup_in_config(config, ["NETseq", "pause_calling", model, "filter"], "not input_sample.isnull()"))
+        lookup_in_config(config, ["NETseq", "pause_calling", model, "filter"], "not sample_name.isnull()"))
         if model_type == "Genomewide":
             for sample in these_samples:
                 outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.tsv.gz"%(model_type,model,sample))

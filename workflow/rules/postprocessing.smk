@@ -51,14 +51,14 @@ rule run_postprocessing:
 
 def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio.bw")
     files = [file_sig%(sample) for sample in these_samples]
     return files
 
 def pull_labels_for_deeptools_models(toolname, modelname, config, pep):
-    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
     return " ".join(these_samples)
 
 rule deeptools_byregion:
@@ -159,7 +159,7 @@ rule deeptools_referencepoint:
 
 def pull_bws_for_stranded_models(toolname, modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
 

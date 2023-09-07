@@ -17,13 +17,13 @@ rule run_modeling:
 
 def all_htseq_for_modeling(model, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["modeling", model, "filter"], "not sample_name.isnull()"))
     quant_path = lookup_in_config(config, ["modeling", model, "count_path"]) + "%s.tsv"
     files = [quant_path%(sample) for sample in these_samples]
     return files
 
 def pull_sample_labels_for_modeling(modelname, config, pep):
-    these_samples = filter_samples(pep, lookup_in_config(config, ["modeling", modelname, "filter"], "not input_sample.isnull()"))
+    these_samples = filter_samples(pep, lookup_in_config(config, ["modeling", modelname, "filter"], "not sample_name.isnull()"))
     return " ".join(these_samples)
 
 rule HTseq_readcount:
@@ -58,7 +58,7 @@ def create_metadata_table(model, config, pep, outfile):
         all_keys.remove("sample")
     if "fileName" in all_keys:
         all_keys.remove("fileName")
-    all_samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    all_samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not sample_name.isnull()"))
     # write output to a file
     with open(outfile, mode = "w") as outf:
         # header needs sample and kallisto path
@@ -118,7 +118,7 @@ def get_all_kallisto_output_dirs(model, config):
     """
     Pull all the kallisto paths per sample
     """
-    samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not sample_name.isnull()"))
     out_samples = {}
     for sample in samples:
         out_samples[sample] = "results/pseudoalignment/kallisto/%s/%s"%(model,sample)
@@ -145,7 +145,7 @@ def create_sleuth_metadata_table(model, config, pep, outfile):
         all_keys.remove("path")
     if "sample" in all_keys:
         all_keys.remove("path")
-    all_samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not input_sample.isnull()"))
+    all_samples = filter_samples(pep, lookup_in_config(config, ["modeling", model, "filter"], "not sample_name.isnull()"))
     # write output to a file
     with open(outfile, mode = "w") as outf:
         # header needs sample and kallisto path
