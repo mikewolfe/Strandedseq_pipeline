@@ -19,10 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around
   rate filtering issue and multiqc to deal with python updates
+- Enable the ability to choose which QC you want to run
 
 ### Bug fixes
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input
   files
+- Fixed issues with sample sheets that do not have a input_sample or only have
+  single end samples
 
 ## 0.0.3
 
