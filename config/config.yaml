@@ -357,6 +357,7 @@ postprocessing:
         # Can specify different "models" to run by naming them here
         # Model 1 - look at the full coverage for all genes
         all_genes_cov:
+            filter: "not input_sample.isnull()"
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
@@ -383,6 +384,7 @@ postprocessing:
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
+            filter: "not input_sample.isnull()"
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
@@ -406,6 +408,7 @@ postprocessing:
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?
+            filter: "not input_sample.isnull()"
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
@@ -428,6 +431,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
+            filter: "not input_sample.isnull()"
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
@@ -451,6 +455,7 @@ postprocessing:
             # have an associated input sample so that the input samples
             # themselves are not run.
             filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: "not input_sample.isnull()"
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -538,7 +543,7 @@ NETseq:
     pause_calling:
         test:
             model_type: "Genomewide"
-            NETseq_pause_params: "--method Larson --circular True --filter cov --cov_cutoff 1"
+            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
             filter: "seq_method == 'NETseq'"
             wsize: 100
 

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files
 - Fixed issues with sample sheets that do not have a input_sample or only have
   single end samples
+- Fixed bug in NETseq pause calling that would only report last chromosome
 
 ## 0.0.3
 

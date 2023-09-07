@@ -110,10 +110,11 @@ rule NETseq_pause_logo:
     output:
         "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo.pdf"
     log:
+        stdout = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.log",
         stderr = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.err"
     threads:
         1
     conda:
         "../envs/R.yaml"
     shell:
-        "Rscript workflow/scripts/NETseq_plot_logo.R {input} {output}"
+        "Rscript workflow/scripts/NETseq_plot_logo.R {input} {output} > {log.stdout}  2> {log.stderr}"

@@ -366,6 +366,7 @@ def multiprocess_larson(window, rng, *extras):
 
 
 def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
+    all_output = []
     for chrm, array in arrays.items():
         filter_keep = initial_filters[chrm]
         filter_keep = create_final_filter(array, args.wsize, args.circular, filter_keep, filters)
@@ -380,8 +381,8 @@ def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
         pool.close()
         pool.join()
         output = [[chrm] + entry for entry in output]
-
-    return output
+        all_output += output
+    return all_output
 
 def genomewide_fast(args):
     
@@ -440,7 +441,6 @@ def genomewide_fast(args):
     sys.stdout.write(headers[args.method])
     output_plus = run_tests_over_strand(arrays_plus, methods, all_filters, starting_filters['+'], args)
     output_minus = run_tests_over_strand(arrays_minus, methods, all_filters, starting_filters['-'], args)
-
     total_plus = len(output_plus)
     output = output_plus + output_minus
     pvals = [val[-1] for val in output]

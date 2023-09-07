@@ -14,9 +14,13 @@ def lookup_sample_metadata(sample, key, pep):
     """
     Get sample metadata by key
     """
+    from pandas import isna
     if sample not in pep.sample_table.index:
         raise KeyError("Sample %s not in sample table"%sample)
-    return pep.sample_table.at[sample, key]
+    out = pep.sample_table.at[sample, key]
+    if isna(out):
+        raise ValueError("Sample %s has no value at key %s"%(sample, key))
+    return out
 
 def match_fastq_to_sample(sample, pair, pep):
     out = lookup_sample_metadata(sample, "file_path", pep)
@@ -29,13 +33,12 @@ def match_fastq_to_sample(sample, pair, pep):
     return out
 
 def determine_single_end(sample, pep):
-    from pandas import isna
     if "filenameR2" in pep.sample_table:
-        r2 = lookup_sample_metadata(sample, "filenameR2", pep)
-        if isna(r2):
+        try:
+            r2 = lookup_sample_metadata(sample, "filenameR2", pep)
+        except ValueError:
             out = True
-        else:
-            out = False
+        out = False
     else:
         out = True
     return out
