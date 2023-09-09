@@ -668,7 +668,8 @@ def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = N
 
     return function(out_array)
 
-def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, M_trim = 30, A_trim = 5, pseudocount = 0):
+def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, M_trim = 0.30, A_trim = 0.05, pseudocount = 0, A_cutoff = -1e10):
+    from scipy import stats
     # turn everything into one big array
     sa = []
     ra = []
@@ -684,28 +685,44 @@ def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_cont
     # Add a pseudo count
     sa = sa + pseudocount
     ra = ra + pseudocount
-    # filter out locations < 0
-    mask = np.logical_and(np.logical_and(np.isfinite(sa),sa > 0), np.logical_and( np.isfinite(ra) , ra > 0))
-    sa = sa[mask]
-    ra = ra[mask]
+    
+
+    # adapted from EdgeR code here: https://rdrr.io/bioc/edgeR/src/R/calcNormFactors.R
 
     # calculate M values
-
     Mvals = np.log2(sa/total_sa) - np.log2(ra/total_ra)
     # Calculate A values
     Avals = (np.log2(sa/total_sa) + np.log2(ra/total_ra))/2
+    # calculate estimated variance
+    v = (total_sa - sa)/total_sa/sa + (total_ra - ra)/total_ra/ra
+
+    # get finite values
+    mask = np.logical_and(np.logical_and(np.isfinite(Mvals),np.isfinite(Avals)), Avals > A_cutoff)
+
+    Mvals = Mvals[mask]
+    Avals = Avals[mask]
+    v = v[mask]
+
+    if(max(abs(Mvals)) < 1e-6):
+        return 1
 
     # Determiming trimming based on A and M
-    M_trim_mask = np.logical_and(Mvals > np.percentile(Mvals, M_trim), Mvals < np.percentile(Mvals, 100-M_trim))
-    A_trim_mask = np.logical_and(Avals > np.percentile(Avals, A_trim), Avals < np.percentile(Avals, 100-A_trim))
-    sa = sa[np.logical_and(M_trim_mask, A_trim_mask)]
-    ra = ra[np.logical_and(M_trim_mask, A_trim_mask)]
+    # Following EdgeRs copy of the original mean function
+    total_M = len(Mvals)
+    lo_M = np.floor(total_M*M_trim) + 1
+    hi_M = total_M + 1 - lo_M
+    lo_A = np.floor(total_M*A_trim) + 1
+    hi_A = total_M + 1 - lo_A
+    M_trim_mask = np.logical_and(stats.rankdata(Mvals) >= lo_M, stats.rankdata(Mvals)<= hi_M)
+    A_trim_mask = np.logical_and(stats.rankdata(Avals) >= lo_A, stats.rankdata(Avals)<= hi_A)
+    Mvals = Mvals[np.logical_and(M_trim_mask, A_trim_mask)]
+    Avals = Avals[np.logical_and(M_trim_mask, A_trim_mask)]
+    v = v[np.logical_and(M_trim_mask, A_trim_mask)]
 
     # Calculate TMM values for final TMM calc
-    Mr_gk = np.log2(sa/total_sa)-np.log2(ra/total_ra)
-    # lifted from edgeR code here: https://rdrr.io/bioc/edgeR/src/R/calcNormFactors.R
-    v_gk = (total_sa - sa)/total_sa/sa + (total_ra - ra)/total_ra/ra
-    TMM = np.power(2, np.sum(Mr_gk/v_gk)/np.sum(1/v_gk))
+    TMM = np.power(2, np.sum(Mvals/v)/np.sum(1/v))
+    if not np.isfinite(TMM):
+        TMM = 1
     return TMM
 
 def geometric_mean(arrays, axis = 0, pseudocount = 1.0):
