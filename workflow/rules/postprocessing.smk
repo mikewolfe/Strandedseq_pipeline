@@ -171,7 +171,9 @@ def pull_bws_for_stranded_models(toolname, modelname, config, pep, strand = "plu
     return files
 
 def run_antisense(wildcards):
-    if lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "antisense"], False):
+    antisense = lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "antisense"], False)
+    antisense = str(antisense).lower()
+    if antisense == "true":
         out = "--antisense"
     else:
         out = " "
