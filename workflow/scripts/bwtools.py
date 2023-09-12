@@ -640,45 +640,104 @@ def multicompare_main(args):
             res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     close_multiple_bigwigs(groupA_handles)
 
-def single_num_summary(arrays, function, contigs = None):
+def single_num_summary(arrays, function, contigs = None, expected_locs = None, res = None):
+    import bed_utils
     if contigs is None:
         contigs = arrays.keys()
-    out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
-    i = 0
-    for chrm in contigs:
-        arrsize = arrays[chrm].size
-        out_array[i:i+arrsize] = arrays[chrm][:]
-        i = i + arrsize
+    if expected_locs is not None:
+        out_array = []
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(sample_array[this_chrm])
+            left_coord = max(region["start"] - args.upstream, 0)
+            right_coord = min(region["end"] + args.downstream, array_len * res)
+            out_array.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+        out_array = np.concatenate(out_array) 
+    else:
+        out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
+        i = 0
+        for chrm in contigs:
+            arrsize = arrays[chrm].size
+            out_array[i:i+arrsize] = arrays[chrm][:]
+            i = i + arrsize
     return function(out_array)
 
 
-def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = None):
+def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = None, expected_locs = None, res = None, antisense = False):
+    import bed_utils
     if contigs is None:
         contigs = arrays_plus.keys()
-    out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
-    i = 0
-    for chrm in contigs:
-        arrsize = arrays_plus[chrm].size
-        out_array[i:i+arrsize] = arrays_plus[chrm][:]
-        i = i + arrsize
-    for chrm in contigs:
-        arrsize = arrays_minus[chrm].size
-        out_array[i:i+arrsize] = arrays_minus[chrm][:]
-        i = i + arrsize
+
+    if expected_locs is not None:
+        out_array = []
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(arrays_plus[this_chrm])
+            if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                left_coord = max(region["start"] - args.downstream, 0)
+                right_coord = min(region["end"] + args.upstream, array_len * res)
+                out_array.append(arrays_minus[this_chrm][left_coord//res:right_coord//res])
+            else:
+                left_coord = max(region["start"] - args.upstream, 0)
+                right_coord = min(region["end"] + args.downstream, array_len * res)
+                out_array.append(arrays_plus[this_chrm][left_coord//res:right_coord//res])
+        out_array = np.concatenate(out_array)
+    else:
+        out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
+        i = 0
+        for chrm in contigs:
+            arrsize = arrays_plus[chrm].size
+            out_array[i:i+arrsize] = arrays_plus[chrm][:]
+            i = i + arrsize
+        for chrm in contigs:
+            arrsize = arrays_minus[chrm].size
+            out_array[i:i+arrsize] = arrays_minus[chrm][:]
+            i = i + arrsize
 
     return function(out_array)
 
-def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, M_trim = 0.30, A_trim = 0.05, pseudocount = 0, A_cutoff = -1e10):
+def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, expected_locs = None, res = None, antisense = False, M_trim = 0.30, A_trim = 0.05, pseudocount = 0, A_cutoff = -1e10):
     from scipy import stats
+    import bed_utils
     # turn everything into one big array
     sa = []
     ra = []
-    for contig in spike_contigs:
-        sa.append(sample_array[contig])
-        ra.append(reference_array[contig])
-    if minus_sa is not None:
-        sa.append(minus_sa[contig])
-        ra.append(minus_ra[contig])
+    if expected_locs is not None:
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(sample_array[this_chrm])
+            # stranded locations
+            if minus_sa is not None:
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                    left_coord = max(region["start"] - args.downstream, 0)
+                    right_coord = min(region["end"] + args.upstream, array_len * res)
+                    sa.append(minus_sa[this_chrm][left_coord//res:right_coord//res])
+                    ra.append(minus_ra[this_chrm][left_coord//res:right_coord//res])
+                else:
+                    left_coord = max(region["start"] - args.upstream, 0)
+                    right_coord = min(region["end"] + args.downstream, array_len * res)
+                    sa.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+                    ra.append(reference_array[this_chrm][left_coord//res:right_coord//res])
+            # unstranded locations
+            else:
+                left_coord = max(region["start"] - args.upstream, 0)
+                right_coord = min(region["end"] + args.downstream, array_len * res)
+                sa.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+                ra.append(reference_array[this_chrm][left_coord//res:right_coord//res])
+
+    else:
+        for contig in spike_contigs:
+            sa.append(sample_array[contig])
+            ra.append(reference_array[contig])
+        if minus_sa is not None:
+            sa.append(minus_sa[contig])
+            ra.append(minus_ra[contig])
 
     sa = np.concatenate(sa)
     ra = np.concatenate(ra)
@@ -750,12 +809,14 @@ def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
     scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
     return scale_array(array, scale_factor, pseudocount)
 
-def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res, upstream = 0, downstream = 0):
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs= None, res = None, upstream = 0, downstream = 0):
     import bed_utils
     from sklearn.linear_model import LinearRegression
     if expected_locs is not None:
         inbed = bed_utils.BedFile()
         inbed.from_bed_file(expected_locs)
+    if spike_contigs is None:
+        spike_contigs = ext_array.keys()
     mask_array = {}
     for contig in spike_contigs:
         mask_array[contig] = np.ones(len(ext_array[contig]), bool)
@@ -814,7 +875,7 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     return np.mean(resids)
 
 
-def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res):
+def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res, antisense = False):
     import bed_utils
     from sklearn.linear_model import LinearRegression
     if expected_locs is not None:
@@ -829,7 +890,7 @@ def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array
         for region in inbed:
             if region["chrm"] in spike_contigs:
                 array_len = len(mask_array["+"][contig])
-                if region["strand"] == "-":
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
                     left_coord = max(region["start"] - args.downstream, 0)
                     right_coord = min(region["end"] + args.upstream, array_len * res)
                     mask_array["-"][region["chrm"]][left_coord//res:right_coord//res] = 0
@@ -1006,7 +1067,7 @@ def normfactor_main(args):
     overall = overall.merge(tmm2_column, on = 'sample_name', how = 'left')
 
     # DEseq2 size factors spike-in only
-    if args.spikecontigs is not None:
+    if args.spikecontigs is not None or args.expected_regions is not None:
     
         # stranded version
         if args.ext_bws_minus is not None:
@@ -1015,7 +1076,8 @@ def normfactor_main(args):
             for array_plus, array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, args.samples):
                 compared_minus = compare_divide(add_pseudocount(array_minus, args.pseudocount), geom_means_minus)
                 compared_plus = compare_divide(add_pseudocount(array_plus, args.pseudocount), geom_means_plus)
-                deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian, contigs = args.spikecontigs))
+                deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian, contigs = args.spikecontigs,
+                    expected_locs = args.expected_regions, res = args.res, antisense = args.antisense))
 
             deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
             overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
@@ -1023,7 +1085,8 @@ def normfactor_main(args):
         else:
             deseq2_sfs = []
             for array, sample in zip(bw_arrays, args.samples):
-                deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, contigs = args.spikecontigs))
+                deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, 
+                    contigs = args.spikecontigs, expected_locs = args.expected_regions, res = args.res))
             deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
             overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
 
@@ -1046,6 +1109,9 @@ def normfactor_main(args):
                             args.spikecontigs,
                             minus_sa = array_minus,
                             minus_ra = bw_minus_arrays[high_frag_index],
+                            expected_locs = args.expected_regions,
+                            res = args.res,
+                            antisense = args.antisense,
                             pseudocount = args.pseudocount))
     
         # unstranded version
@@ -1063,6 +1129,8 @@ def normfactor_main(args):
                             overall.loc[overall["sample_name"] == sample, "total_frag"].values[0],
                             overall.loc[overall["sample_name"] == ref_sample, "total_frag"].values[0],
                             args.spikecontigs,
+                            expected_locs = args.expected_regions,
+                            res = args.res,
                             pseudocount = args.pseudocount))
     
 
@@ -1092,7 +1160,8 @@ def normfactor_main(args):
                         scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
                         args.spikecontigs,
                         args.expected_regions,
-                        args.res))
+                        args.res,
+                        antisense = args.antisense))
                 regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
@@ -1316,6 +1385,7 @@ if __name__ == "__main__":
             should be set no lower than the resolution of the input file")
     parser_normfactor.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
+    parser_normfactor.add_argument("--antisense", action = "store_true", help = "Use antisense instead of sense values for each expected region")
     parser_normfactor.set_defaults(func=normfactor_main)
 
     

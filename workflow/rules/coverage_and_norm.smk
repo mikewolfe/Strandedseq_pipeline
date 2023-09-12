@@ -660,7 +660,10 @@ def pull_labels_for_group_norm_models(modelname, config, pep):
 
 def pull_expected_regions_group_norm_models(modelname, config, pep):
     spikeregions = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "regions"], "")
-    if spikeregions is not "":
+    antisense = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "antisense"], False)
+    if spikeregions is not "" and antisense:
+        out = "--expected_regions %s --antisense"%(spikeregions)
+    elif spikeregions is not "":
         out = "--expected_regions %s"%(spikeregions)
     else:
         out = ""
