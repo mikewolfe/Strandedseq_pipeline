@@ -412,9 +412,22 @@ def genomewide_fast(args):
         for chrm, array in arrays_minus.items():
             starting_filters['-'][chrm] = np.ones(len(array), dtype = bool)
 
+    # add a way to set problem regions to zero
+
+    if args.zero_regions is not None:
+        import bed_utils
+        zero_bed = bed_utils.BedFile()
+        zero_bed.from_bed_file(args.zero_regions)
+        for entry in zero_bed:
+            strand = entry['strand']
+            chrm = entry['chrm']
+            start = entry['start']
+            end = entry['end']
+            if strand == "-":
+                arrays_minus[chrm][start:end] = 0
+            else:
+                arrays_plus[chrm][start:end] = 0
         
-
-
     # function factory for different methods
     methods = {'bootstrap': bootstrap_method,
             'Poisson': poisson_method,
@@ -562,6 +575,8 @@ if __name__ == "__main__":
     parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
     parser_genome.add_argument('--regions', type = str, help = "Regions to only consider. Ignore anything outside these regions. Default = None",
+            default = None)
+    parser_genome.add_argument('--zero_regions', type = str, help = "Regions to set to zero. Useful for removing known artifacts. Default = None",
             default = None)
     parser_genome.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
             default = True)

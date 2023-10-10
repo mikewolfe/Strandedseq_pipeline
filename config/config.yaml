@@ -563,6 +563,12 @@ NETseq:
             filter: "seq_method == 'NETseq'"
             wsize: 100
 
+        test_mask:
+            model_type: "Genomewide"
+            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2 --zero_regions results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            filter: "seq_method == 'NETseq'"
+            wsize: 100
+
 
 # Control for transcriptome assembly
 # WIP

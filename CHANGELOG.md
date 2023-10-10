@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stranded spike-in normalization using variety of methods including Bonhoure et
   al. method and DEseq2 method
 - Deduplication with Picard MarkDuplicates.
+- Ability to set specific locations to zero when doing NETseq pause calling
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around
