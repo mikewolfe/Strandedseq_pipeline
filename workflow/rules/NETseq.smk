@@ -80,9 +80,9 @@ rule NETseq_region_pause_calling:
         "{params.NETseq_pause_params} --p {threads} "
         "2> {log.stderr} | gzip > {output} "
 
-def find_sample_fasta(sample, pep):
+def find_sample_fasta(sample, pep, ending = ".fa"):
     genome = lookup_sample_metadata(sample, "genome", pep)
-    return "results/alignment/combine_fasta/%s/%s.fa"%(genome, genome)
+    return "results/alignment/combine_fasta/%s/%s%s"%(genome, genome, ending)
 
 rule NETseq_pause_seqs:
     input:
@@ -104,11 +104,29 @@ rule NETseq_pause_seqs:
         "--upstream {params.upstream} --downstream {params.downstream} --circular "
         " 2> {log.stderr} | gzip >  {output}"
 
+rule generate_bg_model:
+    input:
+        "results/alignment/combine_fasta/{genome}/{genome}.fa"
+    output:
+        "results/alignment/combine_fasta/{genome}/{genome}_mm.txt"
+    log:
+        stderr = "results/alignment/logs/fasta-get-markov/{genome}.log"
+    conda:
+        "../envs/motif_calling.yaml"
+    threads:
+        1
+    shell:
+        "fasta-get-markov {input} > {output} 2> {log.stderr}"
+
+
 rule NETseq_pause_logo:
     input:
-        "results/NETseq/{model_type}_pause/{model}/{sample}_pause_seqs.txt.gz"
+        seqs="results/NETseq/{model_type}_pause/{model}/{sample}_pause_seqs.txt.gz",
+        bg_model = lambda wildcards: find_sample_fasta(wildcards.sample, pep, ending = "_mm.txt")
     output:
-        "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo.pdf"
+        "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo.pdf",
+        "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo_bg_corrected.pdf",
+
     log:
         stdout = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.log",
         stderr = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.err"
@@ -117,4 +135,5 @@ rule NETseq_pause_logo:
     conda:
         "../envs/R.yaml"
     shell:
-        "Rscript workflow/scripts/NETseq_plot_logo.R {input} {output} > {log.stdout}  2> {log.stderr}"
+        "Rscript workflow/scripts/NETseq_plot_logo.R {input.seqs} results/NETseq/{wildcards.model_type}_pause/{wildcards.model}/{wildcards.sample}_pause_logo "
+        "{input.bg_model} > {log.stdout}  2> {log.stderr}"
