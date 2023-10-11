@@ -15,7 +15,8 @@ bg_cor <- d %>% mutate(seq = str_split(seq, "", n = 18, simplify = TRUE)) %>%
     left_join(prior, by = "value") %>% 
     group_by(name) %>% 
     mutate(total_inf = sum(freq*log2(freq/prior))) %>% ungroup() %>% 
-    mutate(height = total_inf*freq) %>% select(name, value, height) %>% 
+    mutate(rel_ent = pmax(freq* log2(freq/prior), 0)) %>%
+    mutate(height = rel_ent) %>% select(name, value, height) %>% 
     pivot_wider(names_from = name, values_from = height) %>%
     column_to_rownames("value") %>%
     as.matrix()
@@ -28,7 +29,7 @@ p$scales$scales[[1]] <- scale_x_continuous(breaks = seq(1, 18, by = 1),
 ggsave(str_c(args[2], ".pdf"),  p, width = 5, height = 2)
 
 p <- ggseqlogo(bg_cor, method = "custom", seq_type = 'dna')
-p <- p + theme_classic() 
+p <- p + theme_classic() + labs(y = "Relative Entropy")
 p$scales$scales[[1]] <- scale_x_continuous(breaks = seq(1, 18, by = 1), 
                                            labels= c(seq(-13,-1,by=1), seq(1, 5, by = 1)))
 
