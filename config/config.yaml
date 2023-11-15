@@ -569,6 +569,12 @@ NETseq:
             filter: "seq_method == 'NETseq'"
             wsize: 100
 
+        test_gini:
+            model_type: "Gini"
+            NETseq_pause_params: "--method Gini_null_ratio --circular True --cov_cutoff 1 --filters 'cov' --alpha 0.05 --n_boot 2000 --regions results/alignment/combine_bed/U00096.3/U00096.3.bed --no_qvalue"
+            filter: "seq_method == 'NETseq'"
+            wsize: 100
+
 
 # Control for transcriptome assembly
 # WIP

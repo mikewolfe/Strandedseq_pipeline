@@ -12,6 +12,9 @@ def determine_NETseq_pause_output(config, pep):
         elif model_type == "Region":
             for sample in these_samples:
                 outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
+        elif model_type == "Gini":
+            for sample in these_samples:
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
         else:
             raise ValueError("Model type %s not supported for NETseq pause calling. Need one of Genomewide or Region"%(model_type))
     return outfiles
@@ -30,6 +33,32 @@ rule run_NETseq:
 rule run_NETseq_logos:
     input:
         determine_logo_output(config, pep)
+
+
+rule NETseq_genomewide_gini:
+    input:
+        "results/coverage_and_norm/deeptools_coverage/{sample}_plus_raw.bw",
+        "results/coverage_and_norm/deeptools_coverage/{sample}_minus_raw.bw"
+    output:
+        "results/NETseq/Gini_pause/{model}/{sample}_pause_calls.bed.gz"
+    log:
+        stderr = "results/NETseq/logs/Gini_pause/{sample}_gw_gini_{model}.err"
+    params:
+       NETseq_pause_params = lambda wildcards: lookup_in_config(config,
+       ["NETseq", "pause_calling", wildcards.model, "NETseq_pause_params"],
+       "--method Gini_null_ratio --n_boot 2000"),
+       wsize = lambda wildcards: lookup_in_config(config,\
+       ["NETseq", "pause_calling", wildcards.model, "wsize"],
+       "100")
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    threads:
+        10
+    shell:
+        "python3 "
+        "workflow/scripts/NETseq_pause_calling.py Genomewide_gini {input} {params.wsize} "
+        "{params.NETseq_pause_params} --p {threads} "
+        "2> {log.stderr} | gzip > {output} "
 
 rule NETseq_genomewide_pause:
     input:
