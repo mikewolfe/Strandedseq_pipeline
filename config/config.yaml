@@ -562,6 +562,7 @@ NETseq:
             NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
             filter: "seq_method == 'NETseq'"
             wsize: 100
+            NETseq_logo_params: "--upstream 12 --downstream 5 --filter_column 8 --filter_value 0.05 --filter_direction less"
 
         test_mask:
             model_type: "Genomewide"

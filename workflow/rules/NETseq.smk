@@ -20,10 +20,26 @@ def determine_NETseq_pause_output(config, pep):
     return outfiles
 
 def determine_logo_output(config, pep):
-    out = []
-    for val in determine_NETseq_pause_output(config, pep):
-        out.append(val.replace("pause_calls.bed.gz", "pause_logo.pdf"))
-    return out
+    outfiles = []
+    for model in lookup_in_config(config, ["NETseq", "pause_calling"], []):
+        if lookup_in_config(config, ["NETseq", "pause_calling", model, "plot_logos"], "true") != "true":
+            continue
+        model_type = lookup_in_config(config, ["NETseq", "pause_calling", model, "model_type"], 
+        err = "Need model type specified for pause_calling model %s in config file. I.e. \nNETseq:\n\tpause_calling:\n\t%s:\n\t\tmodel_type: 'Genomewide'"%(model,model))
+        these_samples = filter_samples(pep, \
+        lookup_in_config(config, ["NETseq", "pause_calling", model, "filter"], "not sample_name.isnull()"))
+        if model_type == "Genomewide":
+            for sample in these_samples:
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_logo.pdf"%(model_type,model,sample))
+        elif model_type == "Region":
+            for sample in these_samples:
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_logo.pdf"%(model_type,model,sample))
+        elif model_type == "Gini":
+            for sample in these_samples:
+                outfiles.append("results/NETseq/%s_pause/%s/%s_pause_logo.pdf"%(model_type,model,sample))
+        else:
+            raise ValueError("Model type %s not supported for NETseq pause calling. Need one of Genomewide or Region"%(model_type))
+    return outfiles
         
 
 rule run_NETseq:
@@ -122,15 +138,16 @@ rule NETseq_pause_seqs:
     log:
         stderr = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_seqs.err"
     params:
-        upstream = 12,
-        downstream = 5
+       NETseq_logo_params = lambda wildcards: lookup_in_config(config,\
+       ["NETseq", "pause_calling", wildcards.model, "NETseq_logo_params"],
+       "--upstream 12 --downstream 5")
     conda:
         "../envs/coverage_and_norm.yaml"
     threads:
         1
     shell:
         "zcat {input.bed} | python3 workflow/scripts/pull_seq_from_bed.py - {input.fasta} "
-        "--upstream {params.upstream} --downstream {params.downstream} --circular "
+        "{params.NETseq_logo_params} "
         " 2> {log.stderr} | gzip >  {output}"
 
 rule generate_bg_model:
