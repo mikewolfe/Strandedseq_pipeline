@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update versions of some packages including ncbi-acc-download to get around
   rate filtering issue and multiqc to deal with python updates
 - Enable the ability to choose which QC you want to run
+- Allow fasta files to complement full IUPAC nomenclature i.e. R complements Y.
 
 ### Bug fixes
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input
