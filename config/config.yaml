@@ -121,6 +121,7 @@ coverage_and_norm:
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_spike_rpm_sfs"]
+            dwnsample: ["total_frag", "spike_frag", "nonspike_frag"]
 
         all_samples_antisense:
             metadata: "pep/test_samples.csv"

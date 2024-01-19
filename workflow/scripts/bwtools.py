@@ -262,20 +262,45 @@ def manipulate_main(args):
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
-            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount) }
+            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
-    # read in file 
-    inf = pyBigWig.open(args.infile)
-    
-    # convert to a dictionary of arrays
-    arrays = bigwig_to_arrays(inf, res = args.res)
-    
-    # perform operation on arrays
-    arrays = operation_dict[args.operation](arrays)
+    # Extra logic if trying to downsample everything which requires both strands
+    # for stranded data
+    # if stranded also open minus strand file
+    if args.operation == "downsample":
 
-    # write out file
-    write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
-    inf.close()
+        # read in file 
+        inf = pyBigWig.open(args.infile)
+    
+        # convert to a dictionary of arrays
+        arrays = bigwig_to_arrays(inf, res = args.res, nan_to_zero = True)
+        if args.minus_strand is not None:
+            inf_minus = pyBigWig.open(args.minus_strand)
+            arrays_minus = bigwig_to_arrays(inf_minus, res = args.res, nan_to_zero = True)
+            dwn_plus, dwn_minus = downsample(arrays, args.scalefactor_table, args.scalefactor_id, arrays_minus)
+
+            write_arrays_to_bigwig(args.outfile, dwn_plus, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            write_arrays_to_bigwig(args.minus_strand_out, dwn_minus, inf_minus.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            inf.close()
+            inf_minus.close()
+        else:
+            dwn_plus, dwn_minus = downsample(arrays, args.scalefactor_table, args.scalefactor_id)
+            write_arrays_to_bigwig(args.outfile, dwn_plus, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            inf.close()
+    else:
+
+        # read in file 
+        inf = pyBigWig.open(args.infile)
+    
+        # convert to a dictionary of arrays
+        arrays = bigwig_to_arrays(inf, res = args.res)
+
+        # perform operation on arrays
+        arrays = operation_dict[args.operation](arrays)
+
+        # write out file
+        write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+        inf.close()
 
 def read_multiple_bws(bw_files, res = 1):
     all_bws = {}
@@ -809,6 +834,69 @@ def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
     scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
     return scale_array(array, scale_factor, pseudocount)
 
+def to_one_array(array, minus_array = None):
+    indices = {}
+    indices["+"] = {}
+    start = 0
+    out_array = []
+    for chrm in array.keys():
+        indices["+"][chrm] = [start, start + array[chrm].size]
+        start += array[chrm].size
+        out_array.append(array[chrm])
+
+    if minus_array is not None:
+        indices["-"] = {}
+        for chrm in minus_array.keys():
+            indices["-"][chrm] = [start, start + minus_array[chrm].size]
+            start += minus_array[chrm].size
+            out_array.append(minus_array[chrm])
+    out_array = np.concatenate(out_array)
+
+    return (indices, out_array)
+
+
+def from_one_array(array, indices):
+    plus_out_array = {}
+    minus_out_array = {}
+    for key in indices["+"]:
+        chrm_idx = indices["+"][key]
+        plus_out_array[key] = array[chrm_idx[0]:chrm_idx[1]]
+    if "-" in indices.keys():
+        for key in indices["-"]:
+            chrm_idx = indices["-"][key]
+            minus_out_array[key] = array[chrm_idx[0]:chrm_idx[1]]
+
+    return (plus_out_array, minus_out_array)
+
+
+def downsample_array(array, total, minus_array = None, seed = 42):
+    indices, one_array = to_one_array(array, minus_array)
+
+    total_count = int(np.sum(one_array))
+
+    count_to_remove = total_count - int(total)
+
+    if count_to_remove <= 0:
+        raise ValueError("Trying to downsample more (%s) than total count (%s)"%(total, total_count))
+
+    overall_idx = np.arange(0, one_array.size, dtype = int)
+
+    rng = np.random.default_rng(seed = seed)
+
+    dwnsample_idx = rng.choice(overall_idx, size = count_to_remove, p = one_array/total_count, replace = True)
+    for idx in dwnsample_idx:
+        one_array[idx] = one_array[idx] - 1
+
+    return from_one_array(one_array, indices)
+
+
+def downsample(array, scalefactor_table, scalefactor_id, minus_array = None):
+    import pandas as pd
+
+    sf_table = pd.read_csv(scalefactor_table, sep = "\t")
+    dwn_total = np.min(sf_table.loc[:, scalefactor_id[1]])
+    return downsample_array(array, dwn_total, minus_array)
+
 def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs= None, res = None, upstream = 0, downstream = 0):
     import bed_utils
     from sklearn.linear_model import LinearRegression
@@ -1247,6 +1335,8 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('infile', type=str, 
             help="file to convert from")
     parser_manipulate.add_argument('outfile', type=str, help="file to convert to")
+    parser_manipulate.add_argument("--minus_strand", type = str, help = "minus strand file for stranded data")
+    parser_manipulate.add_argument("--minus_strand_out", type = str, help = "minus strand out file for stranded data")
     parser_manipulate.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
@@ -1254,7 +1344,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth' 'scale_byfactor'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'scale_byfactor', 'downsample'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,

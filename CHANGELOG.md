@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- Ability to downsample aligned data based on group minimum
 - Gini coefficient calculations for NETseq data
 - Pseudoalignment with Kallisto for stranded data
 - Modeling with Sleuth

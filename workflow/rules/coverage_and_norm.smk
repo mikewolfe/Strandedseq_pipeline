@@ -21,6 +21,10 @@ def determine_group_norm_files(config, pep):
         for norm_type in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "methods"], []):
             for strand in ["plus", "minus"]:
                 outfiles.extend(["results/coverage_and_norm/group_norm/%s/%s_%s_%s.bw"%(model, sample, strand, norm_type) for sample in these_samples]) 
+        for dwnsample in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "dwnsample"], []):
+            for strand in ["plus", "minus"]:
+                outfiles.extend(["results/coverage_and_norm/group_norm/%s/dwnsample/%s_%s_%s.bw"%(model, sample, strand, dwnsample) for sample in these_samples]) 
+
 
     return outfiles
 
@@ -739,6 +743,35 @@ rule bwtools_scale_byfactor:
        "{input.infile} {output} "
        "--res {params.resolution} --operation scale_byfactor "
        "--pseudocount {params.pseudocount} "
+       "--scalefactor_table {input.sf_tab} "
+       "--scalefactor_id {wildcards.sample} {wildcards.norm} "
+       "{params.dropNaNsandInfs} "
+       "> {log.stdout} 2> {log.stderr}"
+
+rule bwtools_dwnsample:
+    input:
+        inplus = lambda wildcards: get_sample_for_scale_byfactor(wildcards.model, wildcards.sample, "plus", config, pep),
+        inminus = lambda wildcards: get_sample_for_scale_byfactor(wildcards.model, wildcards.sample, "minus", config, pep),
+        sf_tab="results/coverage_and_norm/group_norm/{model}/{model}_scale_factors.tsv"
+    output:
+        outplus="results/coverage_and_norm/group_norm/{model}/dwnsample/{sample}_plus_{norm}.bw",
+        outminus="results/coverage_and_norm/group_norm/{model}/dwnsample/{sample}_minus_{norm}.bw"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    wildcard_constraints:
+        norm="total_frag|spike_frag|nonspike_frag"
+    log:
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/dwnsample/{sample}_{norm}.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/dwnsample/{sample}_{norm}.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py manipulate "
+       "{input.inplus} {output.outplus} "
+       "--minus_strand {input.inminus} --minus_strand_out {output.outminus} "
+       "--res {params.resolution} --operation downsample "
        "--scalefactor_table {input.sf_tab} "
        "--scalefactor_id {wildcards.sample} {wildcards.norm} "
        "{params.dropNaNsandInfs} "
