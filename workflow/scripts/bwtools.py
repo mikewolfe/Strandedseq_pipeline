@@ -459,6 +459,36 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
                 outf.write(line)
 
 
+def gini_coefficient(data, unbiased = False):
+    '''
+    Calculate the gini coefficient for a 1D set of data
+    Arguments:
+        data - 1D numpy array of data
+        unbiased - boolean to determine if unbiased estimator should be used
+    References:
+        https://en.wikipedia.org/wiki/Gini_coefficient
+        https://www.statsdirect.com/help/nonparametric_methods/gini_coefficient.htm
+        https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python
+    Formula:
+        Standard:
+        $G = \frac{1}{n} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+        Unbiased:                                                                
+        $G = \frac{1}{n-1} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+    '''
+    data_sorted = np.sort(data)
+    n = len(data)
+    # the sum of the cumulative sum vector gives the numerator when the data
+    # is sorted in ascending order. The float here prevents integer overflows
+    cumulative = np.cumsum(data_sorted, dtype = float)
+    # the last value in a cumulative vector is the total sum
+    stat = (n + 1 - 2 * np.sum(cumulative)/ cumulative[-1])
+    if unbiased:
+        stat = stat/(n-1)
+    else:
+        stat = stat/n
+    return stat
+
+
 def query_main(args):
     import bed_utils
 
@@ -497,7 +527,8 @@ def query_main(args):
             'TR_B': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
             # kept for compatibility
             'TR_fixed' : lambda array: traveling_ratio(array, args.res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
-            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream)}
+            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream),
+            'Gini': lambda array: gini_coefficient(array)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
@@ -894,7 +925,17 @@ def downsample(array, scalefactor_table, scalefactor_id, minus_array = None):
     import pandas as pd
 
     sf_table = pd.read_csv(scalefactor_table, sep = "\t")
-    dwn_total = np.min(sf_table.loc[:, scalefactor_id[1]])
+    if scalefactor_id[1] == "nonspike_frags" or scalefactor_id[1] == "spike_frags":
+        total = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], "total_frags"].values[0]
+        spike = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], "spike_frags"].values[0]
+        if scalefactor_id[1] == "nonspike_frags":
+            scale_factor = total/(total-spike)
+        else:
+            scale_factor = total/spike
+    else:
+        scale_factor = 1
+    dwn_total = int(np.min(sf_table.loc[:, scalefactor_id[1]])*scale_factor)
+
     return downsample_array(array, dwn_total, minus_array)
 
 def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs= None, res = None, upstream = 0, downstream = 0):
@@ -1412,7 +1453,7 @@ if __name__ == "__main__":
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
             'identity' summary. mean, median, max, min supported. Additionally, traveling ratio ('TR') and relative polymerase progression ('RPP'), \
-            traveling ratio A window ('TR_A'), traveling ratio B window ('TR_B'),  and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
+            traveling ratio A window ('TR_A'), traveling ratio B window ('TR_B'),  Gini coefficient ('Gini') and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
     parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.add_argument('--TR_A_center', type = int, help = "center of window A in fixed traveling ratio. In relative bp to region start")
     parser_query.add_argument('--wsize', type = int, default = 50, help = "Size of half window in bp for calcs that use windows. Default = 50 bp")

@@ -207,6 +207,8 @@ coverage_and_norm:
     bwtools_smooth:
         param_string:
             value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
+
+    ## NOTE NEEDS REVAMP FOR STRANDED DATA
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -233,7 +235,7 @@ coverage_and_norm:
         # How many regions to look at for max scaling
         number_of_regions:
             value: 10
-
+    ## NOTE NEEEDS REVAMP FOR STRANDED DATA
     bwtools_multicompare:
         # Run these models by doing `snakemake --use-conda --cores
         # N run_bwtools_multicompare`.
@@ -381,14 +383,14 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
             downstream: 0
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
@@ -405,14 +407,14 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
             downstream: 0
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
@@ -428,7 +430,7 @@ postprocessing:
             filter: "not input_sample.isnull()"
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -444,12 +446,33 @@ postprocessing:
             frac_na: 0.20
 
 
+        all_genes_Gini:
+            # which regions to use?
+            filter: "not input_sample.isnull()"
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "Gini"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+
         all_genes_antisense_mean:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
             filter: "not input_sample.isnull()"
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -476,10 +499,10 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_%s_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
@@ -501,7 +524,7 @@ postprocessing:
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
@@ -524,7 +547,7 @@ postprocessing:
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
@@ -539,11 +562,11 @@ postprocessing:
              # which regions to use?
              regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
              # which files to use? Note we can use a different set than Model 1
-             filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
+             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_log2strandratio.bw"
              # what resolution to query data (shouldn't be lower than the
              # resolution of your file, think of this as a sampling rate, no 
              # averaging is done over the bins)
-             res : 5
+             res : 1
              # How do you want to summarize your data? (identity gives every data
              # point in tidy format, single allows for a single number summary)
              summarize: "single"
