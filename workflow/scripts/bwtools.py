@@ -732,8 +732,6 @@ def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = N
         inbed.from_bed_file(expected_locs)
         for region in inbed:
             this_chrm = region["chrm"]
-            if this_chrm not in arrays_plus.keys():
-                continue
             array_len = len(arrays_plus[this_chrm])
             if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
                 left_coord = max(region["start"] - args.downstream, 0)
@@ -748,14 +746,10 @@ def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = N
         out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
         i = 0
         for chrm in contigs:
-            if chrm not in arrays_plus.keys():
-                continue
             arrsize = arrays_plus[chrm].size
             out_array[i:i+arrsize] = arrays_plus[chrm][:]
             i = i + arrsize
         for chrm in contigs:
-            if chrm not in arrays_minus.keys():
-                continue
             arrsize = arrays_minus[chrm].size
             out_array[i:i+arrsize] = arrays_minus[chrm][:]
             i = i + arrsize
