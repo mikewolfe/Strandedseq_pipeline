@@ -20,16 +20,6 @@ def qc_groups(config, pep):
     column = determine_grouping_category(config)
     return pep.sample_table[column].unique().tolist()
 
-def fastqc_files_output(pep, type_string = "processed"):
-    out = []
-    for sample in samples(pep):
-        if determine_single_end(sample, pep):
-            out.append("results/quality_control/fastqc_%s/%s_%s_R0_fastqc.html"%(type_string, sample, type_string))
-        else:
-            out.append("results/quality_control/fastqc_%s/%s_%s_R1_fastqc.html"%(type_string, sample, type_string))
-            out.append("results/quality_control/fastqc_%s/%s_%s_R2_fastqc.html"%(type_string,sample, type_string))
-    return out
-
 def determine_qc_to_run(config, pep):
     out = []
     groups = qc_groups(config, pep)
@@ -106,13 +96,22 @@ rule combine_frags_per_contig:
 
 # General read QC
 
+def fastqc_files_output(pep, type_string = "processed"):
+    out = []
+    for sample in samples(pep):
+        if determine_single_end(sample, pep):
+            out.append("results/quality_control/fastqc_%s/%s_%s_R0_fastqc.html"%(type_string, sample, type_string))
+        else:
+            out.append("results/quality_control/fastqc_%s/%s_%s_R1_fastqc.html"%(type_string, sample, type_string))
+            out.append("results/quality_control/fastqc_%s/%s_%s_R2_fastqc.html"%(type_string,sample, type_string))
+    return out
+
 rule read_qc:
     input:
         fastqc_files_output(pep, "processed"),
         fastqc_files_output(pep, "raw")
     output:
         touch("results/quality_control/read_qc.done")
-
 
 
 rule fastqc_raw:
@@ -163,22 +162,18 @@ rule fastqc_processed:
 
 # ChIP QC will be done by groups thus we need to write a few helpers
 
-
 def get_sample_by_group(group, pep):
     samp_table = pep.sample_table
     grouping_category = determine_grouping_category(config)
     samples = samp_table.loc[samp_table[grouping_category] == group, "sample_name"]
     return samples.tolist()
 
+def qc_groups(config, pep):
+    column = determine_grouping_category(config)
+    return pep.sample_table[column].unique().tolist()
 
 def get_pe_samples(pep):
-    out = []
-    for sample in samples(pep):
-        if determine_single_end(sample, pep):
-            continue
-        else:
-            out.append(sample)
-    return out
+    return filter_samples(pep, "not filenameR2.isnull()")
 
 # OVERALL RULE FOR ChIP QC
 
