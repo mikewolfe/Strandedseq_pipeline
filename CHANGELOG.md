@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow fasta files to complement full IUPAC nomenclature i.e. R complements Y.
 
 ### Bug fixes
+- Issue with syntax of comparisons in `coverage_and_norm.smk`
 - Issue with using `not input_sample.isnull()` in higher version of snakemake
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input
   files

@@ -43,11 +43,11 @@ def match_fastq_to_sample(sample, pair, pep):
 
 def determine_single_end(sample, pep):
     if "filenameR2" in pep.sample_table:
-        try:
-            r2 = lookup_sample_metadata(sample, "filenameR2", pep)
-        except ValueError:
+        r2 = lookup_sample_metadata_default(sample, "filenameR2", pep, "")
+        if r2 == "":
             out = True
-        out = False
+        else:
+            out = False
     else:
         out = True
     return out

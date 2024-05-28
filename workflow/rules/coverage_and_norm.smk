@@ -584,7 +584,7 @@ def pull_bws_for_bwtools_multicompare(modelname, config, pep):
     file_sig = lookup_in_config(config, ['coverage_and_norm', modelname, 'filesignature'],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
     groupA = [file_sig%(sample) for sample in groupA_samples]
-    if groupB_filter is not "":
+    if groupB_filter != "":
         for sample in filter_samples(pep, groupB_filter):
             groupA.append(file_sig%(sample))
     return groupA
@@ -593,7 +593,7 @@ def grouped_bws_for_bwtools_multicompare(modelname, config, pep, group_name):
     group_sample_filter = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_%s'%group_name], "")
     file_sig = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filesignature'],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
-    if group_sample_filter is not "":
+    if group_sample_filter != "":
         group = " ".join([file_sig%(sample) for sample in filter_samples(pep, group_sample_filter)])
         group = "--%s "%(group_name) + group
     else:
@@ -668,9 +668,9 @@ def pull_expected_regions_group_norm_models(modelname, config, pep):
     spikeregions = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "regions"], "")
     antisense = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "antisense"], "false")
     antisense = str(antisense).lower()
-    if spikeregions is not "" and antisense == "true":
+    if spikeregions != "" and antisense == "true":
         out = "--expected_regions %s --antisense"%(spikeregions)
-    elif spikeregions is not "":
+    elif spikeregions != "":
         out = "--expected_regions %s"%(spikeregions)
     else:
         out = ""
