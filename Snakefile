@@ -18,9 +18,18 @@ def lookup_sample_metadata(sample, key, pep):
     if sample not in pep.sample_table.index:
         raise KeyError("Sample %s not in sample table"%sample)
     out = pep.sample_table.at[sample, key]
-    if isna(out):
+    if isna(out) or out == "":
         raise ValueError("Sample %s has no value at key %s"%(sample, key))
     return out
+
+def lookup_sample_metadata_default(sample, key, pep, default = None):
+    try: 
+        out = lookup_sample_metadata(sample, key, pep)
+    except ValueError:
+        logger.warning("No value found for sample: '%s' column: '%s'. Defaulting to %s"%(sample, key, default))
+        out = default
+    return out
+        
 
 def match_fastq_to_sample(sample, pair, pep):
     out = lookup_sample_metadata(sample, "file_path", pep)

@@ -112,7 +112,7 @@ coverage_and_norm:
             pseudocount: 0.1
             spikecontigs: "U00096.3"
             # only consider the samples that have a genotype A
-            filter: 'not input_sample.isnull()'
+            filter: 'not input_sample.isnull() and input_sample != ""'
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
@@ -128,7 +128,7 @@ coverage_and_norm:
             pseudocount: 0.1
             spikecontigs: "U00096.3"
             # only consider the samples that have a genotype A
-            filter: 'not input_sample.isnull()'
+            filter: 'not input_sample.isnull() and input_sample != ""'
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
@@ -145,7 +145,7 @@ coverage_and_norm:
             pseudocount: 0.1
             spikecontigs: "U00096.3"
             # only consider the samples that have a genotype A
-            filter: 'not input_sample.isnull()'
+            filter: 'not input_sample.isnull() and input_sample != ""'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
@@ -314,7 +314,7 @@ peak_calling:
     macs2_all:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -332,7 +332,7 @@ motif_calling:
         # Which motif caller? Supports meme and streme
         motif_caller: "streme"
         # Which samples to run on?
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which file to run on?
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         # Parameters for the background markov model
@@ -348,7 +348,7 @@ motif_calling:
     # Same thing but running a different motif finder
     macs2_all_meme:
         motif_caller: "meme"
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         get_markov_param_string:
             value: "-dna -m 0"
@@ -376,7 +376,7 @@ postprocessing:
         # Can specify different "models" to run by naming them here
         # Model 1 - look at the full coverage for all genes
         all_genes_cov:
-            filter: "not input_sample.isnull()"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
@@ -403,7 +403,7 @@ postprocessing:
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
-            filter: "not input_sample.isnull()"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
@@ -427,7 +427,7 @@ postprocessing:
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?
-            filter: "not input_sample.isnull()"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
@@ -448,7 +448,7 @@ postprocessing:
 
         all_genes_Gini:
             # which regions to use?
-            filter: "not input_sample.isnull()"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
@@ -471,7 +471,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filter: "not input_sample.isnull()"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
@@ -494,8 +494,7 @@ postprocessing:
             # only consider the samples that have a genotype A. Ensure that they
             # have an associated input sample so that the input samples
             # themselves are not run.
-            filter: 'genotype == "A" and not input_sample.isnull()'
-            filter: "not input_sample.isnull()"
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -515,7 +514,7 @@ postprocessing:
         # Model 4 - look at the traveling ratio for samples in genotype A
         genotypeA_all_genes_TR:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -538,7 +537,7 @@ postprocessing:
         # ratio
         genotypeA_all_genes_TR:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -562,7 +561,7 @@ postprocessing:
              # which regions to use?
              regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
              # which files to use? Note we can use a different set than Model 1
-             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_log2strandratio.bw"
+             filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
              # what resolution to query data (shouldn't be lower than the
              # resolution of your file, think of this as a sampling rate, no 
              # averaging is done over the bins)
@@ -570,7 +569,7 @@ postprocessing:
              # How do you want to summarize your data? (identity gives every data
              # point in tidy format, single allows for a single number summary)
              summarize: "single"
-             filter: "input_sample.isnull() or not input_sample.isnull()"
+             filter: "not sample_name.isnull()"
              # What single number summary do you want (mean, median, max, min,
              # etc.)
              # only defined when summarize is "single"
@@ -619,7 +618,7 @@ modeling:
         # Which modeler
         program: "DESeq2"
         # Which samples?
-        filter: "not input_sample.isnull()"
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which quantification:
         count_path: "results/modeling/feature_counting/all_genes/HTseq_readcount/"
         # Whats the full model?
@@ -631,7 +630,7 @@ modeling:
         # Which modeler
         program: "sleuth"
         # Which samples?
-        filter: "not input_sample.isnull()"
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which features should be counted?
         genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
         regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"

@@ -644,8 +644,10 @@ rule run_bwtools_multicompare:
 
 
 def pull_bws_for_group_norm_models(modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
+    
     these_samples = filter_samples(pep, \
     lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not sample_name.isnull()"))
+
     file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
 

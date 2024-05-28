@@ -66,7 +66,7 @@ def create_metadata_table(model, config, pep, outfile):
         outf.write(header)
         for sample in all_samples:
             # for any value that doesn't exist for that sample give an NA
-            values = [str(lookup_sample_metadata(sample, key, pep)) for key in all_keys]
+            values = [str(lookup_sample_metadata_default(sample, key, pep, "")) for key in all_keys]
             line = "%s\t"%(sample) + "%s.tsv\t"%(sample)+ "\t".join(values) + "\n"
             outf.write(line)
 
@@ -153,7 +153,7 @@ def create_sleuth_metadata_table(model, config, pep, outfile):
         outf.write(header)
         for sample in all_samples:
             # for any value that doesn't exist for that sample give an NA
-            values = [str(lookup_sample_metadata(sample, key, pep)) for key in all_keys]
+            values = [str(lookup_sample_metadata_default(sample, key, pep, "")) for key in all_keys]
             line = "%s\t"%(sample) + "\t".join(values) + "\t" + paths[sample] + "\n"
             outf.write(line)
 
