@@ -415,6 +415,8 @@ postprocessing:
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 1
+            # What resolution to output at. Average data over bins
+            res_to: 50
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"

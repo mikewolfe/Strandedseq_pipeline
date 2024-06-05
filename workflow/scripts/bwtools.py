@@ -34,6 +34,87 @@ def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandI
             outf.addEntries(names[the_finite], starts[the_finite], 
                     ends = ends[the_finite], values=this_array[the_finite])
 
+
+def write_arrays_to_bedgraph(outfilename, arrays, chrm_dict, res = 1, dropNaNsandInfs = False, header=False):
+    """
+    Convert a set of arrays for each contig to a bedgraph file
+    
+    Args:
+        outfilename - (str) output file name
+        arrays - (dict) a dictionary of numpy arrays
+        chrm_dict - (dict) a dictionary of chromosome lengths
+        res - resolution that the array is in
+    Returns:
+        Writes a bedgraph file
+    """
+    with open(outfilename, "w") as outf:
+        if header:
+            outf.write("chrom\tstart\tend\tvalue\n")
+        chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+        for key in chrm_dict.keys():
+            this_array = arrays[key]
+            # make sure nans don't get added to the bedgraph file
+            if dropNaNsandInfs:
+                the_finite = np.isfinite(this_array)
+            else:
+                the_finite = np.ones(len(this_array), dtype=bool)
+            starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
+            ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
+            if len(ends) < len(starts):
+                ends = np.append(ends, chrm_dict[key])
+            names = np.array([key]*len(starts))
+            for name, start, end, value in zip(names[the_finite], starts[the_finite], ends[the_finite], this_array[the_finite]):
+                outf.write("%s\t%s\t%s\t%s\n"%(name, start, end, value))
+
+def write_arrays_to_wig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandInfs = False, header=False):
+    """
+    Convert a set of arrays for each contig to a bedgraph file
+    
+    Args:
+        outfilename - (str) output file name
+        arrays - (dict) a dictionary of numpy arrays
+        chrm_dict - (dict) a dictionary of chromosome lengths
+        res - resolution that the array is in
+    Returns:
+        Writes a variableStep .wig file
+    """
+    with open(outfilename, "w") as outf:
+
+        outf.write("track type=wiggle_0\n")
+        chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+        for key in chrm_dict.keys():
+            if key in arrays:
+                this_array = arrays[key]
+            else:
+                continue
+            # make sure nans don't get added to the bedgraph file
+            if dropNaNsandInfs:
+                the_finite = np.isfinite(this_array)
+            else:
+                the_finite = np.ones(len(this_array), dtype=bool)
+            starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
+            ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
+            if len(ends) < len(starts):
+                ends = np.append(ends, chrm_dict[key])
+            names = np.array([key]*len(starts))
+            # write header for chromosome
+            outf.write("variableStep chrom=%s\n"%(key))
+            # Simplest wig, one row per datum. Put datum on start of bin.
+            for name, start, end, value in zip(names[the_finite], starts[the_finite], ends[the_finite], this_array[the_finite]):
+                outf.write("%s %s\n"%(start+1, value))
+
+def change_array_resolution(arrays, chrm_dict, summary_func = np.nanmean, res_from = 1, res_to = 1):
+    """
+    Change the resolution of an array by applying a summary function over bins
+    """
+    if res_to < res_from:
+        raise ValueError("Can't go from lower res to higher res (%s to %s)"%(res_from, res_to))
+    chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+    for key in chrm_dict.keys():
+        this_array = arraytools.to_lower_resolution(arrays[key], res_to//res_from, summary_func)
+        arrays[key] = this_array
+    return arrays
+
 def bigwig_to_arrays(bw, res = None, nan_to_zero = False):
     """
     Convert a bigwig to a dictionary of numpy arrays, one entry per contig
@@ -115,7 +196,7 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
 
-def smooth(arrays, wsize, kernel_type, edge, sigma = None):
+def smooth(arrays, wsize, kernel_type, edge, sigma = None, scaler = None):
     """
     Smooth data using a convolution with a kernel (flat or gaussian).
 
@@ -130,9 +211,29 @@ def smooth(arrays, wsize, kernel_type, edge, sigma = None):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge, sigma)
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
     return arrays
 
-def savgol(arrays, wsize, polyorder, edge):
+
+def smooth_spline(arrays, knots = None, scaler = None):
+    """
+    Smooth data using a cubic Bspline
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        knots (list) - locations in array coordinates of knots
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        these_knots = knots.get(chrm, None)
+        arrays[chrm] = arraytools.Bspline_1D(arrays[chrm], these_knots)
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
+    return arrays
+
+def savgol(arrays, wsize, polyorder, edge, scaler = None):
     """
     Smooth data using a Savtizky-Golay filter
 
@@ -149,7 +250,29 @@ def savgol(arrays, wsize, polyorder, edge):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.savgol_1D(arrays[chrm], wsize, polyorder=polyorder, edge=edge)
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
     return arrays
+
+
+def smooth_GLMGam(arrays, max_knots=10, scaler = None):
+    """
+    Smooth data using a GLMGam.
+    Assumes you are working with count data since it fits
+    a Poisson model
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        max_knots (int) - maximum number of knots to start with
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.GLMGam_1D(arrays[chrm], max_knots)
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
+    return arrays
+
 
 
 def fixed_subtract(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
@@ -243,6 +366,19 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1, su
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
 
+def read_knot_file(knot_file, res = 1):
+    if knot_file is not None:
+        with open(knot_file, mode = "r") as inf:
+            knot_dict = {}
+            for line in inf:
+                chrm, knot = line.split("\t")
+                these_knots = knot_dict.get(chrm, [])
+                these_knots.append(int(knot)//res)
+                knot_dict[chrm] = these_knots
+    else:
+        knot_dict = None
+
+    return knot_dict
 
 
 def manipulate_main(args):
@@ -250,6 +386,12 @@ def manipulate_main(args):
     summary_func_dict = { "mean": np.nanmean,
             "median": np.nanmedian,
             "sum": np.nansum }
+    scaler_dict = {"min_max": lambda x: arraytools.min_max_1D(x),
+                    "fractional": lambda x: arraytools.fractional_1D(x)}
+    if args.smooth_scaler is not None:
+        smooth_scaler = scaler_dict[args.smooth_scaler]
+    else:
+        smooth_scaler = None
 
     operation_dict={"RobustZ": RobustZ_transform, 
             "Median_norm": lambda x: Median_norm(x, args.pseudocount),
@@ -259,9 +401,11 @@ def manipulate_main(args):
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
-            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
-            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
-            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
+            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma, min_max = args.smooth_minmax),
+            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, scaler = smooth_scaler),
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, scaler = smooth_scaler),
+            "Bspline_smooth": lambda x: smooth_spline(x, read_knot_file(args.smooth_knots, args.res), scaler = smooth_scaler),
+            "GLMGam_smooth": lambda x: smooth_GLMGam(x, args.gam_max_knots, scaler = smooth_scaler),
             "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
     # Extra logic if trying to downsample everything which requires both strands
@@ -297,17 +441,19 @@ def manipulate_main(args):
 
         # perform operation on arrays
         arrays = operation_dict[args.operation](arrays)
-
+        
         # write out file
         write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
         inf.close()
 
-def read_multiple_bws(bw_files, res = 1):
+def read_multiple_bws(bw_files, res = 1, res_to = None):
     all_bws = {}
     open_fhandles = [pyBigWig.open(fname) for fname in bw_files]
     for fname, handle in zip(bw_files, open_fhandles):
         print(fname)
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
+        if res_to is not None:
+            all_bws[fname] = change_array_resolution(all_bws[fname], handle.chroms(), res_from = res, res_to =res_to)
     return (all_bws, open_fhandles)
 
 
@@ -495,7 +641,7 @@ def query_main(args):
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(args.regions)
     res = args.res
-    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
+    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = args.res, res_to = args.res_to)
     if args.gzip:
         import gzip
     
@@ -517,17 +663,23 @@ def query_main(args):
         all_minus_bws = None
         minus_stfn = None
 
+
+    if args.res_to is not None:
+        res = args.res_to
+    else:
+        res = args.res
+
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
-            'TR_A': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
-            'TR_B': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
+            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
+            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
+            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
             # kept for compatibility
-            'TR_fixed' : lambda array: traveling_ratio(array, args.res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
-            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream),
+            'TR_fixed' : lambda array: traveling_ratio(array, res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
+            'summit_loc': lambda array: summit_loc(array, res, args.wsize, args.upstream),
             'Gini': lambda array: gini_coefficient(array)}
     try:
         summary_func = summary_funcs[args.summary_func]
@@ -706,10 +858,10 @@ def single_num_summary(arrays, function, contigs = None, expected_locs = None, r
         inbed.from_bed_file(expected_locs)
         for region in inbed:
             this_chrm = region["chrm"]
-            array_len = len(sample_array[this_chrm])
+            array_len = len(arrays[this_chrm])
             left_coord = max(region["start"] - args.upstream, 0)
             right_coord = min(region["end"] + args.downstream, array_len * res)
-            out_array.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+            out_array.append(arrays[this_chrm][left_coord//res:right_coord//res])
         out_array = np.concatenate(out_array) 
     else:
         out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
@@ -1114,6 +1266,24 @@ def normfactor_main(args):
         overall = overall.merge(spike_frag_sf_column, on = 'sample_name', how = 'left')
         overall = overall.merge(nonspike_frag_sf_column, on = 'sample_name', how = 'left')
 
+        # get the change in the fraction of spike-in fragments from ext to inp
+        diff_in_spike_values = []
+        for sample in args.samples:
+            #print(overall.loc[overall["sample_name"] == sample, "spike_frag"], sample)
+            diff_in_spike_values.append(np.power(2, np.log2(\
+                    overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/ \
+                    overall.loc[overall["sample_name"] == sample, "total_frag"].values[0])- \
+                    np.log2( \
+                    overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0], "spike_frag"].values[0]/\
+                    overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0], "total_frag"].values[0])))
+
+        diff_in_spike = pd.DataFrame(data = {'diff_spike_sfs': diff_in_spike_values, 'sample_name': args.samples})
+        overall = overall.merge(diff_in_spike, on = 'sample_name', how = 'left')
+        diff_in_spike_rpm = pd.DataFrame(data = {'diff_spike_rpm_sfs': overall["diff_spike_sfs"]*overall["total_frag_sfs"],\
+                'sample_name': overall['sample_name']})
+
+        overall = overall.merge(diff_in_spike_rpm, on = 'sample_name', how = 'left')
+
     # DEseq2 size factors
     # stranded version
     if args.ext_bws_minus is not None:
@@ -1281,6 +1451,10 @@ def normfactor_main(args):
             inp_minus_bw_arrays = convert_bigwigs_to_arrays(inp_minus_bw_handles, res = args.res)
             regress_resids = []
             regress_rpm = []
+
+            regress_total = []
+            regress_total_rpm = []
+
             for ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, inp_plus_bw_arrays, inp_minus_bw_arrays, args.samples):
                 regress_resids.append(get_stranded_regression_estimates(\
                         scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
@@ -1291,16 +1465,39 @@ def normfactor_main(args):
                         args.expected_regions,
                         args.res,
                         antisense = args.antisense))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+
+
+                regress_total.append(get_stranded_regression_estimates(\
+                        scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                        args.spikecontigs,
+                        args.expected_regions,
+                        args.res,
+                        antisense = args.antisense))
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
             lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled/np.mean(lib_scaled), 'sample_name': args.samples})
-    
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+
             overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+
+
+            regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples}) 
+            regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name': args.samples})   
+            lib_total_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
+            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': lib_total_scaled, 'sample_name': args.samples})
+
+            overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
+    
         # unstranded version
         else:
             inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
@@ -1321,8 +1518,8 @@ def normfactor_main(args):
                         args.res,
                         args.upstream,
                         args.downstream))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
-                regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0])
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+                regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0])
 
                 regress_total.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
                         scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
@@ -1331,24 +1528,24 @@ def normfactor_main(args):
                         args.res,
                         args.upstream,
                         args.downstream))
-                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag"].values[0])
+                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})    
             lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': (lib_scaled/np.mean(lib_scaled)), 'sample_name': args.samples})
-            spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
-            regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+            #spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
+            #regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
 
             regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples})
             regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name':args.samples})
             total_lib_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
-            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled/np.mean(total_lib_scaled), 'sample_name': args.samples})
+            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled, 'sample_name': args.samples})
             
             overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
+            #overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
 
             overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
@@ -1365,6 +1562,36 @@ def normfactor_main(args):
         close_multiple_bigwigs(bw_handles)
         close_multiple_bigwigs(inp_bw_handles)
 
+def convert_main(args):
+    summary_operation_dict = {"mean": np.nanmean,
+            "sum": np.nansum,
+            "median": np.nanmedian,
+            "max": np.nanmax,
+            "min": np.nanmin}
+    # read in files
+    inf = pyBigWig.open(args.infile)
+
+    arrays = bigwig_to_arrays(inf, res = args.inres)
+    # convert resolution
+    if args.inres != args.outres:
+        arrays = change_array_resolution(arrays, inf.chroms(), summary_operation_dict[args.summary_func], \
+                                     res_from = args.inres, res_to = args.outres)
+    # filter chrms you want
+    if args.chrms is not None:
+        out_arrays = {}
+        for chrm in args.chrms:
+            out_arrays[chrm] = arrays[chrm]
+        arrays = out_arrays
+    #write file out
+    if args.outfmt == ".bedgraph":
+        write_arrays_to_bedgraph(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs, header = args.header)
+    elif args.outfmt == ".wig":
+        write_arrays_to_wig(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs, header = args.header)
+    elif args.outfmt == ".bw":
+        write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs)
+    else:
+        raise ValueError("Only support --outfmt of '.bedgraph', '.wig', and '.bw'. Not %s"%(args.outfmt))
+    inf.close()
  
 if __name__ == "__main__":
     import argparse
@@ -1385,7 +1612,8 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'scale_byfactor', 'downsample'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'Bspline_smooth',\
+            'GLMGam_smooth','scale_byfactor', 'downsample'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -1415,6 +1643,13 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
+    parser_manipulate.add_argument('--smooth_scaler', type = str,
+            help = "Scale the smooth signal? min_max = min max scaler. fractional = array/sum(array)*len(array)",
+            default = None)
+    parser_manipulate.add_argument('--smooth_knots', type = str,
+            help = "Text file with one row of chrm\\tknot per knot; Otherwise let smoother find optimal knots", default = None)
+    parser_manipulate.add_argument('--gam_max_knots', type = int,
+            help = "Maximum total knots for gam smoother. Default = 10", default = 10)
     parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
             help = "A table of scale factors for scale_byfactor")
     parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,
@@ -1442,6 +1677,10 @@ if __name__ == "__main__":
     parser_query.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
+    parser_query.add_argument('--res_to', type=int, default=None,
+            help="Resolution to output at. Default same resolution as input. Note this \
+            should be set no lower than the resolution of the input file. \
+            Resolution changes are made by averaging over window before any calculations are done")
     parser_query.add_argument('--regions', type=str, help = "regions to grab data from")
     parser_query.add_argument('--coords', type = str, help = "When running in 'identity' mode do you want 'relative_start', 'relative_center', 'relative_end' or 'absolute' coords? Default = 'absolute'")
     parser_query.add_argument('--upstream', type=int, help = "bp upstream to add", default = 0)
@@ -1518,6 +1757,22 @@ if __name__ == "__main__":
             help = "Drop NaNs and Infs from output bigwig")
     parser_normfactor.add_argument("--antisense", action = "store_true", help = "Use antisense instead of sense values for each expected region")
     parser_normfactor.set_defaults(func=normfactor_main)
+
+
+    # convert verb
+    parser_convert = subparsers.add_parser("convert", help = "Convert a bigwig file into a bedGraph file")
+    parser_convert.add_argument('infile', type = str,
+            help = "file to convert from")
+    parser_convert.add_argument('outfile', type = str, help = "file to convert to")
+    parser_convert.add_argument('--inres', type = int, default = 1, help = "input resolution. Default 1")
+    parser_convert.add_argument('--outres', type = int, default = 1000, help = "output resolution. Default 1000")
+    parser_convert.add_argument('--summary_func', type = str, default = "mean", help = "function to collapse values to lower resolutions, default = mean")
+    parser_convert.add_argument('--header', action = "store_true", help = "include a header?")
+    parser_convert.add_argument('--outfmt', type = str, default = ".bedgraph", help = "what output format? default = '.bedgraph'. Use '.bw' for outputting a bigwig")
+    parser_convert.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output file")
+    parser_convert.add_argument('--chrms', type = str, nargs = "+", default = ".bedgraph", help = "what output format? default = '.bedgraph'. Use '.bw' for outputting a bigwig")
+    parser_convert.set_defaults(func=convert_main)
 
     
     args = parser.parse_args()

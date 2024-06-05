@@ -51,14 +51,14 @@ rule run_postprocessing:
 
 def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio.bw")
     files = [file_sig%(sample) for sample in these_samples]
     return files
 
 def pull_labels_for_deeptools_models(toolname, modelname, config, pep):
-    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
+    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     return " ".join(these_samples)
 
 rule deeptools_byregion:
@@ -159,7 +159,7 @@ rule deeptools_referencepoint:
 
 def pull_bws_for_stranded_models(toolname, modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not sample_name.isnull()"))
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
 
@@ -177,6 +177,24 @@ def run_antisense(wildcards):
         out = "--antisense"
     else:
         out = " "
+    return out
+
+
+def change_resolution_query(config, model):
+    try:
+        out = lookup_in_config(config, ["postprocessing", "bwtools_query", model, "res_to"], None)
+        out = "--res_to %s"%(out)
+    except KeyError as err:
+        out = ""
+    return out
+
+
+def change_resolution_query_stranded(config, model):
+    try:
+        out = lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", model, "res_to"], None)
+        out = "--res_to %s"%(out)
+    except KeyError as err:
+        out = ""
     return out
             
     
@@ -200,7 +218,8 @@ rule bwtools_query_stranded:
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "summary_func"], 'mean'),
         coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "coord"], 'absolute'),
         frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "frac_na"], 0.25),
-        antisense = lambda wildcards: run_antisense(wildcards)
+        antisense = lambda wildcards: run_antisense(wildcards),
+        res_to = lambda wildcards: change_resolution_query_stranded(config, wildcards.model)
     threads:
         5
     conda:
@@ -221,6 +240,7 @@ rule bwtools_query_stranded:
         "--frac_na {params.frac_na} "
         "--gzip "
         "{params.antisense} "
+        "{params.res_to} "
         "> {log.stdout} 2> {log.stderr} "
 
 
@@ -242,6 +262,7 @@ rule bwtools_query:
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
         coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "coord"], 'absolute'),
         frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25),
+        res_to = lambda wildcards: change_resolution_query(config, wildcards.model)
     threads:
         5
     conda:
@@ -260,6 +281,7 @@ rule bwtools_query:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "--gzip "
+        "{params.res_to} "
         "> {log.stdout} 2> {log.stderr} "
 
 rule spearman_per_gene:
