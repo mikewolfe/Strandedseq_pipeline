@@ -1067,8 +1067,17 @@ def downsample_array(array, total, minus_array = None, seed = 42):
     rng = np.random.default_rng(seed = seed)
 
     dwnsample_idx = rng.choice(overall_idx, size = count_to_remove, p = one_array/total_count, replace = True)
-    for idx in dwnsample_idx:
-        one_array[idx] = one_array[idx] - 1
+    for read_num, this_idx in enumerate(dwnsample_idx):
+        #ensure no reads are removed from a zero location
+        n = 0
+        while one_array[this_idx] <= 0:
+            this_idx = rng.choice(overall_idx, size = 1, p = one_array/(total_count-read_num), replace = True)[0]
+            n += 1
+            print("finding new loc, %s, %s"%(n, this_idx))
+            if n > 1000:
+                raise ValueError("Downsampling could not find a non-zero read to remove")
+
+        one_array[this_idx] = one_array[this_idx] - 1
 
     return from_one_array(one_array, indices)
 
@@ -1477,7 +1486,7 @@ def normfactor_main(args):
                         args.expected_regions,
                         args.res,
                         antisense = args.antisense))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
+                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
