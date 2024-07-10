@@ -533,14 +533,20 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
-def traveling_ratio(array, res, wsize, peak_loc = None, upstream = 0, out = "ratio"):
-    if peak_loc is not None:
-        peak_loc = peak_loc + upstream
-        if peak_loc < wsize:
-            raise ValueError("Relative location (%s) must be > wsize (%s) for fixed traveling ratio."%(relative_location, wsize))
-        return arraytools.traveling_ratio(array, wsize = wsize//res, peak = peak_loc//res, out = out)
-    else:
-        return arraytools.traveling_ratio(array, wsize = wsize//res, out = out)
+def traveling_ratio(array, res, wsize, wA = None, wB = None, upstream = 0, out = "ratio"):
+    if wA is not None:
+        # ensure location is relative to start of region not just start of padded array
+        wA = wA + upstream
+        if wA < wsize:
+            raise ValueError("Relative location (%s) must be > wsize (%s) for fixed traveling ratio."%(wA, wsize))
+        wA = wA//res
+
+    if wB is not None:
+        wB = wB + upstream
+        if wB < wsize:
+            raise ValueError("Relative location (%s) must be > wsize (%s) for fixed traveling ratio."%(wB, wsize))
+        wB = wB//res
+    return arraytools.traveling_ratio(array, wsize = wsize//res, wA = wA, wB = wB, out = out)
 
 def summit_loc(array, res, wsize, upstream):
     loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
@@ -674,9 +680,9 @@ def query_main(args):
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
-            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
-            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
+            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "ratio"),
+            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "A") ,
+            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "B"),
             # kept for compatibility
             'TR_fixed' : lambda array: traveling_ratio(array, res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
             'summit_loc': lambda array: summit_loc(array, res, args.wsize, args.upstream),
@@ -1067,17 +1073,8 @@ def downsample_array(array, total, minus_array = None, seed = 42):
     rng = np.random.default_rng(seed = seed)
 
     dwnsample_idx = rng.choice(overall_idx, size = count_to_remove, p = one_array/total_count, replace = True)
-    for read_num, this_idx in enumerate(dwnsample_idx):
-        #ensure no reads are removed from a zero location
-        n = 0
-        while one_array[this_idx] <= 0:
-            this_idx = rng.choice(overall_idx, size = 1, p = one_array/(total_count-read_num), replace = True)[0]
-            n += 1
-            print("finding new loc, %s, %s"%(n, this_idx))
-            if n > 1000:
-                raise ValueError("Downsampling could not find a non-zero read to remove")
-
-        one_array[this_idx] = one_array[this_idx] - 1
+    for idx in dwnsample_idx:
+        one_array[idx] = one_array[idx] - 1
 
     return from_one_array(one_array, indices)
 
@@ -1486,7 +1483,7 @@ def normfactor_main(args):
                         args.expected_regions,
                         args.res,
                         antisense = args.antisense))
-                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
@@ -1704,6 +1701,7 @@ if __name__ == "__main__":
             traveling ratio A window ('TR_A'), traveling ratio B window ('TR_B'),  Gini coefficient ('Gini') and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
     parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.add_argument('--TR_A_center', type = int, help = "center of window A in fixed traveling ratio. In relative bp to region start")
+    parser_query.add_argument('--TR_B_center', type = int, help = "center of window B in fixed traveling ratio. In relative bp to region start")
     parser_query.add_argument('--wsize', type = int, default = 50, help = "Size of half window in bp for calcs that use windows. Default = 50 bp")
     parser_query.set_defaults(func=query_main)
 

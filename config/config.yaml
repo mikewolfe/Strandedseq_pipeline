@@ -537,7 +537,7 @@ postprocessing:
 
         # Model 5 - look at the identified beta peak locations for the traveling
         # ratio
-        genotypeA_all_genes_TR:
+        genotypeA_all_genes_TR_A:
             # only consider the samples that have a genotype A
             filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
@@ -554,9 +554,11 @@ postprocessing:
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summary_func: "TR"
+            summary_func: "TR_B"
+            bwtools_query_params: "--TR_A_center 40 --TR_B_center 200"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
+
     bwtools_query:
          # Model 6 - look at the average strand ratio at each gene
          all_genes_mean_strand_ratio:
