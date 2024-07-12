@@ -533,7 +533,7 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
-def traveling_ratio(array, res, wsize, wA = None, wB = None, upstream = 0, out = "ratio"):
+def traveling_ratio(array, res, wsize, wA = None, wB = None, upstream = 0, out = "ratio", wfunc = np.nanmean):
     if wA is not None:
         # ensure location is relative to start of region not just start of padded array
         wA = wA + upstream
@@ -546,7 +546,7 @@ def traveling_ratio(array, res, wsize, wA = None, wB = None, upstream = 0, out =
         if wB < wsize:
             raise ValueError("Relative location (%s) must be > wsize (%s) for fixed traveling ratio."%(wB, wsize))
         wB = wB//res
-    return arraytools.traveling_ratio(array, wsize = wsize//res, wA = wA, wB = wB, out = out)
+    return arraytools.traveling_ratio(array, wsize = wsize//res, wfunc = wfunc, wA = wA, wB = wB, out = out)
 
 def summit_loc(array, res, wsize, upstream):
     loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
@@ -675,14 +675,19 @@ def query_main(args):
     else:
         res = args.res
 
+    w_funcs = {'mean': np.nanmean,
+               'max': np.nanmax,
+               'min': np.nanmin
+               }
+
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "ratio"),
-            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "A") ,
-            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "B"),
+            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "ratio", wfunc = w_funcs[args.wfunc]),
+            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "A",wfunc = w_funcs[args.wfunc]) ,
+            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "B",wfunc = w_funcs[args.wfunc]),
             # kept for compatibility
             'TR_fixed' : lambda array: traveling_ratio(array, res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
             'summit_loc': lambda array: summit_loc(array, res, args.wsize, args.upstream),
@@ -1703,6 +1708,7 @@ if __name__ == "__main__":
     parser_query.add_argument('--TR_A_center', type = int, help = "center of window A in fixed traveling ratio. In relative bp to region start")
     parser_query.add_argument('--TR_B_center', type = int, help = "center of window B in fixed traveling ratio. In relative bp to region start")
     parser_query.add_argument('--wsize', type = int, default = 50, help = "Size of half window in bp for calcs that use windows. Default = 50 bp")
+    parser_query.add_argument('--wfunc', type = str, default = "mean", help = "Summary calc for window for stats that use windows. Default = mean")
     parser_query.set_defaults(func=query_main)
 
     # compare verb
