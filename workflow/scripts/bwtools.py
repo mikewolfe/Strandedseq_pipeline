@@ -1488,7 +1488,7 @@ def normfactor_main(args):
                         args.expected_regions,
                         args.res,
                         antisense = args.antisense))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
+                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   

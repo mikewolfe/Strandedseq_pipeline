@@ -101,7 +101,7 @@ rule combine_frags_per_contig:
         stderr = "results/quality_control/logs/frags_per_contig/all_samples.err",
         stdout = "results/quality_control/logs/frags_per_contig/all_samples.log"
     shell:
-        "Rscript workflow/scripts/combine_frags_per_contig.R {input} > {log.stdout} 2> {log.stderr}"
+        "Rscript workflow/scripts/combine_frags_per_contig.R {output} {input} > {log.stdout} 2> {log.stderr}"
 
 
 

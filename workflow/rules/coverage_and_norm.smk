@@ -21,10 +21,6 @@ def determine_group_norm_files(config, pep):
         for norm_type in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "methods"], []):
             for strand in ["plus", "minus"]:
                 outfiles.extend(["results/coverage_and_norm/group_norm/%s/%s_%s_%s.bw"%(model, sample, strand, norm_type) for sample in these_samples]) 
-        for dwnsample in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "dwnsample"], []):
-            for strand in ["plus", "minus"]:
-                outfiles.extend(["results/coverage_and_norm/group_norm/%s/dwnsample/%s_%s_%s.bw"%(model, sample, strand, dwnsample) for sample in these_samples]) 
-
 
     return outfiles
 
@@ -642,14 +638,206 @@ rule run_bwtools_multicompare:
         determine_multicompare_models(config)
 
 
+## Group normalization functions
+
+def determine_group_norm_samples(modelname, config, pep):
+    these_samples = filter_samples(pep, \
+    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not sample_name.isnull()"))
+    return these_samples
+
+
+def pull_group_norm_original_bams(modelname, config, pep):
+    samples = determine_group_norm_samples(modelname, config, pep)
+    inp_samples = []
+    for sample in samples:
+        try:
+            inp_samples.append(lookup_sample_metadata(sample, "input_sample", pep))
+        except ValueError:
+            continue
+    out = ["results/alignment/bowtie2/%s_sorted.bam"%(sample) for sample in samples]
+    out.extend(["results/alignment/bowtie2/%s_sorted.bam"%(sample) for sample in inp_samples])
+    return out
+
+
+def pull_group_norm_dwnsampled_bams(modelname, config, pep, outpre = "bam"):
+    samples = determine_group_norm_samples(modelname, config, pep)
+    inp_samples = []
+    for sample in samples:
+        try:
+            inp_samples.append(lookup_sample_metadata(sample, "input_sample", pep))
+        except ValueError:
+            continue
+    out = ["results/coverage_and_norm/group_norm/%s/downsample/bams/%s_sorted.%s"%(modelname,sample,outpre) for sample in samples]
+    out.extend(["results/coverage_and_norm/group_norm/%s/downsample/bams/%s_sorted.%s"%(modelname,sample,outpre) for sample in inp_samples])
+    return out
+
+
+rule total_pair_table:
+    input:
+        lambda wildcards: pull_group_norm_original_bams(wildcards.model, config, pep)
+    output:
+        "results/coverage_and_norm/group_norm/{model}/downsample/paircount_table.tsv"
+    threads: 
+        1
+    conda: 
+        "../envs/alignment.yaml"
+    params:
+        # default is to exclude unmapped reads
+        samtools_filter = lambda wildcards: lookup_in_config(config,\
+        ["coverage_and_norm", "group_norm", wildcards.model, "samtools_count_filter"],\
+        "-F 4")
+    shell:
+        """
+        printf 'sample\tcount\n' > {output}
+        for FILE in {input};
+        do
+        printf "`basename ${{FILE}} _sorted.bam`\t`samtools view -c {params.samtools_filter} ${{FILE}}`\n" >> {output}
+        done
+        """
+
+def get_downsample_fraction(sample, table):
+    import pandas as pd
+    in_table = pd.read_table(table)
+    in_table['frac'] = in_table['count'].min()/in_table['count']
+    return in_table.loc[in_table["sample"] == sample, "frac"].values[0]
+
+rule downsample_bam:
+    input:
+        inbam="results/alignment/bowtie2/{sample}_sorted.bam",
+        paircount_table = "results/coverage_and_norm/group_norm/{model}/downsample/paircount_table.tsv"
+    output:
+        temp("results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_filtered.bam")
+    conda:
+        "../envs/alignment.yaml"
+    params:
+        # default is to exclude unmapped reads
+        samtools_filter = lambda wildcards: lookup_in_config(config,\
+        ["coverage_and_norm", "group_norm", wildcards.model, "samtools_downsample_filter"],\
+        "-F 4"),
+        seed = lambda wildcards: lookup_in_config(config,\
+        ["coverage_and_norm", "group_norm", wildcards.model, "downsample_seed"],\
+        42),
+        dwn_frac = lambda wildcards, input: get_downsample_fraction(wildcards.sample, input.paircount_table)
+    log:
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/bams/{sample}_dwnsample.err",
+    shell:
+        "samtools view -b {params.samtools_filter} --subsample {params.dwn_frac} "
+        "--subsample-seed {params.seed} {input.inbam} > {output} 2> {log.stderr}"
+
+rule sort_downsample_bam:
+    input:
+        "results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_filtered.bam"
+    output:
+        temp("results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam")
+    log:
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/bams/{sample}_bt2_sort.log"
+    conda:
+        "../envs/alignment.yaml"
+    shell:
+        "samtools sort {input} > {output} 2> {log.stderr}"
+
+rule index_downsample_bam:
+    input:
+        "results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam"
+    output:
+        temp("results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam.bai")
+    log:
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/downsample/bams/{sample}_bt2_idx.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/bams/{sample}_bt2_idx.err"
+    conda:
+        "../envs/alignment.yaml"
+    shell:
+        "samtools index {input} {output} > {log.stdout} 2> {log.stderr}"
+
+rule coverage_downsample_bam:
+    input:
+        inbam="results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam",
+        ind="results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam.bai"
+    output:
+        "results/coverage_and_norm/group_norm/{model}/downsample/{sample}_{strand}_raw.bw"
+    log:
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/downsample/{sample}_{strand}_raw.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/{sample}_{strand}_raw.err",
+    params:
+        resolution = RES,
+        strand_param = lambda wildcards: get_strand_param(wildcards.sample, pep, wildcards.strand),
+        masked_regions = lambda wildcards: masked_regions_file_for_deeptools(config, wildcards.sample, pep),
+        bamCoverage_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["coverage_and_norm", "deeptools_coverage", "bamCoverage_param_string"], wildcards.sample,\
+        "--samFlagInclude 67 --extendReads")
+    threads:
+        5
+    wildcard_constraints:
+        strand="plus|minus"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "bamCoverage --bam {input.inbam} --outFileName {output} "
+        "--outFileFormat 'bigwig' "
+        "--numberOfProcessors {threads} --binSize {params.resolution} "
+        "{params.strand_param} "
+        "{params.masked_regions} "
+        "{params.bamCoverage_param_string} "
+        "> {log.stdout} 2> {log.stderr}"
+
+
+rule dwnsample_frags_per_contig:
+    input:
+        infile="results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam",
+        index="results/coverage_and_norm/group_norm/{model}/downsample/bams/{sample}_sorted.bam.bai",
+    output:
+        "results/coverage_and_norm/group_norm/{model}/downsample/frags_per_contig/{sample}_frags_per_contig.tsv"
+    threads: 1
+    conda:
+        "../envs/alignment.yaml"
+    log:
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/{sample}_frags_per_contig.err",
+    params:
+        samtools_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["quality_control", "frags_per_contig", "samtools_param_string"], wildcards.sample,\
+        "-f 67")
+    shell:
+        "samtools view {params.samtools_param_string} {input.infile} | python3 workflow/scripts/fragments_per_contig.py > "
+        "{output} 2> {log.stderr}"
+
+def pull_group_norm_dwnsampled_frags(modelname, config, pep):
+    samples = determine_group_norm_samples(modelname, config, pep)
+    inp_samples = []
+    for sample in samples:
+        try:
+            inp_samples.append(lookup_sample_metadata(sample, "input_sample", pep))
+        except ValueError:
+            continue
+
+    out = ["results/coverage_and_norm/group_norm/%s/downsample/frags_per_contig/%s_frags_per_contig.tsv"%(modelname,sample) for sample in samples]
+    out.extend(["results/coverage_and_norm/group_norm/%s/downsample/frags_per_contig/%s_frags_per_contig.tsv"%(modelname,sample) for sample in inp_samples])
+    return out
+
+rule dwnsample_combine_frags_per_contig:
+    input:
+        lambda wildcards: pull_group_norm_dwnsampled_frags(wildcards.model, config, pep)
+    output:
+        "results/coverage_and_norm/group_norm/{model}/downsample/frags_per_contig/all_samples.tsv"
+    threads: 1
+    conda:
+        "../envs/R.yaml"
+    log:
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/downsample/all_frags_per_contig.err",
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/downsample/all_frags_per_contig.log"
+    shell:
+        "Rscript workflow/scripts/combine_frags_per_contig.R {output} {input} > {log.stdout} 2> {log.stderr}"
+
 
 def pull_bws_for_group_norm_models(modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
     
     these_samples = filter_samples(pep, \
     lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not sample_name.isnull()"))
 
-    file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
-    "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
+    if lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "downsample"], "no") == "yes":
+        file_sig = "results/coverage_and_norm/group_norm/" + modelname + "/downsample/%s_%s_raw.bw"
+    else:
+        file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
+        "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
 
     if ext_or_inp == "ext":
         files = [file_sig%(sample,strand) for sample in these_samples]
@@ -676,6 +864,13 @@ def pull_expected_regions_group_norm_models(modelname, config, pep):
         out = ""
     return out
 
+def get_frag_table(modelname, config, pep):
+    if lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "downsample"], "no") == "yes":
+        out = "results/coverage_and_norm/group_norm/%s/downsample/frags_per_contig/all_samples.tsv"%(modelname)
+    else:
+        out = "results/quality_control/frags_per_contig/all_samples.tsv"
+    return out 
+
 rule group_norm_table:
     input:
         inextbws= lambda wildcards: pull_bws_for_group_norm_models(wildcards.model,config, pep, "plus", ext_or_inp = "ext"),
@@ -683,7 +878,7 @@ rule group_norm_table:
         ininpbws= lambda wildcards: pull_bws_for_group_norm_models(wildcards.model,config, pep, "plus", ext_or_inp = "inp"),
         ininpminusbws= lambda wildcards: pull_bws_for_group_norm_models(wildcards.model,config, pep, "minus", ext_or_inp = "inp"),
         inbed= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "regions"], "config/config.yaml"),
-        fragtable = "results/quality_control/frags_per_contig/all_samples.tsv",
+        fragtable = lambda wildcards: get_frag_table(wildcards.model, config, pep),
         md= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "metadata"], None),
     output:
         outtext="results/coverage_and_norm/group_norm/{model}/{model}_scale_factors.tsv"
