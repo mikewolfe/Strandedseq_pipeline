@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Develop
+## 0.0.4
 
 ### Added
 - Add ability to downsample total reads to match in group normalization
@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specify whether you want sequences pulled for NET-seq pauses or not
 - Ability to plot large logos for NET-seq
 - More pause calling types for NET-seq
+- Ability to skip mark duplicates for bams
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around

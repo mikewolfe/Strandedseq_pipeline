@@ -88,6 +88,9 @@ alignment:
         samtools_view_param_string:
             value: "-b"
 
+    bam_sort:
+        markdups: false
+
 
 # Options to control genome coverage calculations
 coverage_and_norm:
@@ -601,17 +604,17 @@ NETseq:
             NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
             filter: "seq_method == 'NETseq'"
             wsize: 100
-            NETseq_logo_params: "--upstream 12 --downstream 5 --filter_column 8 --filter_value 0.05 --filter_direction less"
+            NETseq_logo_params: "--upstream 12 --downstream 5"
 
         test_mask:
             model_type: "Genomewide"
-            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2 --zero_regions results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
             filter: "seq_method == 'NETseq'"
             wsize: 100
 
         test_gini:
             model_type: "Gini"
-            NETseq_pause_params: "--method Gini_null_ratio --circular True --cov_cutoff 1 --filters 'cov' --alpha 0.05 --n_boot 2000 --regions results/alignment/combine_bed/U00096.3/U00096.3.bed --no_qvalue"
+            NETseq_pause_params: "--method Gini_null_ratio --circular True --cov_cutoff 1 --filters 'cov' --alpha 0.05 --n_boot 2000 --no_qvalue"
             filter: "seq_method == 'NETseq'"
             wsize: 100
 
