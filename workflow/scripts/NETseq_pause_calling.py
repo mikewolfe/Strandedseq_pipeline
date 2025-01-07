@@ -90,7 +90,7 @@ def generate_windows(array, wsize, filter_keep, circular = False):
             yield (loc, array[start:end])
 
 
-def larson_method(window, wsize, *extra):
+def larson_method(window, wsize, *extra, no_center = False):
     """ Calculate rarity of seeing center value 
     
     Expects that the values in the window are normally distributed
@@ -109,9 +109,106 @@ def larson_method(window, wsize, *extra):
     loc, array = window
     mean = np.mean(array)
     stdev = np.std(array)
+
+    median = np.median(array)
+    num_zeros = np.count_nonzero(array==0)
+
     center_value = array[wsize]
     pvalue = sci_stats.norm.sf(center_value, mean, stdev)
-    return [loc, loc+1, center_value, mean, stdev,  pvalue]
+    Zscore = (center_value - mean)/stdev
+    return [loc, loc+1, center_value, mean, stdev, Zscore, median, num_zeros, pvalue]
+
+
+def larson_nocenter_method(window, wsize, *extra):
+    """ Calculate rarity of seeing center value 
+    
+    Expects that the values in the window are normally distributed
+    
+    Args:
+        window - a 1D numpy array
+        wsize - half the size of the window. The center location
+        rng (unused) - a np.random.generator
+
+    Returns:
+        A list of information about the test including:
+        coord, coord + 1,
+        center_value, mean of window, stdev of window, pvalue = (1-cdf
+        normal(mean, stdev))
+    """
+
+    loc, array = window
+    bkg_array = np.concatenate((array[:wsize], array[wsize+1:])) 
+    mean = np.mean(bkg_array)
+    stdev = np.std(bkg_array)
+    median = np.median(bkg_array)
+    num_zeros = np.count_nonzero(bkg_array==0)
+
+    center_value = array[wsize]
+    pvalue = sci_stats.norm.sf(center_value, mean, stdev)
+    Zscore = (center_value - mean)/stdev
+    return [loc, loc+1, center_value, mean, stdev, Zscore, median, num_zeros, pvalue]
+
+
+def larson_robust_method(window, wsize, *extra):
+    """ Calculate rarity of seeing center value 
+    
+    Expects that the values in the window are normally distributed
+    
+    Args:
+        window - a 1D numpy array
+        wsize - half the size of the window. The center location
+        rng (unused) - a np.random.generator
+
+    Returns:
+        A list of information about the test including:
+        coord, coord + 1,
+        center_value, mean of window, stdev of window, pvalue = (1-cdf
+        normal(mean, stdev))
+    """
+
+    loc, array = window
+    bkg_array = np.concatenate((array[:wsize], array[wsize+1:])) 
+    median = np.median(bkg_array)
+    mad = sci_stats.median_abs_deviation(bkg_array)
+    num_zeros = np.count_nonzero(bkg_array==0)
+
+    center_value = array[wsize]
+    pvalue = sci_stats.norm.sf(center_value, median, mad*1.4826)
+    Zscore = (center_value - median)/(mad*1.4826)
+    return [loc, loc+1, center_value, median, mad, Zscore, num_zeros,pvalue]
+
+def estimate_nbinom(array):
+    mu = np.mean(array)
+    std = np.std(array)
+    p = mu/(std**2)
+    n = (mu**2)/(std**2 - mu)
+    return n,p
+
+def churchman_method(window, wsize, *extra):
+    """ Calculate rarity of seeing center value 
+    
+    Expects that the values in the window are normally distributed
+    
+    Args:
+        window - a 1D numpy array
+        wsize - half the size of the window. The center location
+        rng (unused) - a np.random.generator
+
+    Returns:
+        A list of information about the test including:
+        coord, coord + 1,
+        center_value, mean of window, stdev of window, pvalue = (1-cdf
+        normal(mean, stdev))
+    """
+    loc, array = window
+    bkg_array = np.concatenate((array[:wsize], array[wsize+1:])) 
+    n, p = estimate_nbinom(bkg_array)
+    mean = sci_stats.nbinom.mean(n, p)
+    std = sci_stats.nbinom.std(n, p)
+    center_value = array[wsize]
+    pvalue = sci_stats.nbinom.sf(center_value, n, p)
+    Zscore = (center_value - mean)/std
+    return [loc, loc+1, center_value, mean, std, Zscore, pvalue]
 
 
 def poisson_method(window, wsize, *extra):
@@ -175,6 +272,160 @@ def bootstrap_method(window, wsize, rng, n_boot = 10000):
     # actual
     pvalue = (total_greater_eq + 1)/ (n_boot + 1)
     return [loc, loc+1, center_value, total/arr_size, total, total_greater_eq, pvalue]
+
+def gini_coefficient(data, unbiased = False):
+    '''
+    Calculate the gini coefficient for a 1D set of data
+    Arguments:
+        data - 1D numpy array of data
+        unbiased - boolean to determine if unbiased estimator should be used
+    References:
+        https://en.wikipedia.org/wiki/Gini_coefficient
+        https://www.statsdirect.com/help/nonparametric_methods/gini_coefficient.htm
+        https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python
+    Formula:
+        Standard:
+        $G = \frac{1}{n} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+        Unbiased:                                                                
+        $G = \frac{1}{n-1} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+    '''
+    data_sorted = np.sort(data)
+    n = len(data)
+    # the sum of the cumulative sum vector gives the numerator when the data
+    # is sorted in ascending order. The float here prevents integer overflows
+    cumulative = np.cumsum(data_sorted, dtype = float)
+    # the last value in a cumulative vector is the total sum
+    stat = (n + 1 - 2 * np.sum(cumulative)/ cumulative[-1])
+    if unbiased:
+        stat = stat/(n-1)
+    else:
+        stat = stat/n
+    return stat
+
+def gini_boot_method(window, wsize, rng, n_boot = 10000):
+    loc, array = window
+    stat = gini_coefficient(array)
+    boot = sci_stats.bootstrap((array,), gini_coefficient, method = 'percentile',
+            vectorized = False, n_resamples = n_boot)
+    num_zeros = np.count_nonzero(array==0)
+    total = np.nansum(array)
+    return [loc, loc+1, stat, boot.standard_error, boot.confidence_interval[0], boot.confidence_interval[1], num_zeros, total]
+
+def stat_bootstrapped(array, true_val, stat_func, rng, n_boot=1000, alpha = 0.05):
+    total = int(np.sum(array))
+    arr_size = len(array)
+    sample_data = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+    samples = np.apply_along_axis(stat_func, 1, sample_data)
+    total_greater_eq = np.sum(samples >= true_val)
+    median_boot = np.median(samples)
+    low, high  = np.quantile(samples, [alpha, 1-alpha])
+    mad_boot = sci_stats.median_abs_deviation(samples)
+    pvalue = (total_greater_eq +1)/(n_boot + 1)
+    return [median_boot, mad_boot, low, high, pvalue]
+
+
+def stat_bootstrapped_compare(array, true_val, stat_func, compare_func, rng, n_boot=1000, alpha = 0.05):
+    total = int(np.sum(array))
+    arr_size = len(array)
+    sample_data = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+    samples = np.apply_along_axis(stat_func, 1, sample_data)
+    total_greater_eq = np.sum(samples >= true_val)
+    mean_boot = np.mean(samples)
+    std_boot = np.std(samples)
+    Z_boot = (true_val - mean_boot)/std_boot
+    median_boot = np.median(samples)
+    low, high  = np.quantile(samples, [alpha, 1-alpha])
+    mad_boot = sci_stats.median_abs_deviation(samples)
+    pvalue = (total_greater_eq +1)/(n_boot + 1)
+    compared_samples = compare_func(true_val, samples)
+    mean_compare = np.mean(compared_samples)
+    std_compare = np.std(compared_samples)
+    median_compare = np.median(compared_samples)
+    low_compare, high_compare = np.quantile(compared_samples, [alpha, 1-alpha])
+    mad_compare = sci_stats.median_abs_deviation(compared_samples)
+    return [mean_boot, std_boot, Z_boot,median_boot, mad_boot, low, high, pvalue, mean_compare, std_compare, median_compare, mad_compare, low_compare, high_compare]
+
+def multiarray_compare_stat_bootstrapped(arrays, stat_func, baseline_sample, total, rng, n_boot = 1000, alpha = 0.05, pseudocount = 1):
+    arr_size = arrays[0].size
+    sampled_stats = []
+    for array in arrays:
+        sampled_array = rng.multinomial(total, array/np.sum(array), size = n_boot)
+        sampled_stats.append(np.apply_along_axis(stat_func, 1, sampled_array))
+    null_sampled_array = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+    null_sample = np.apply_along_axis(stat_func, 1, null_sampled_array)
+    
+    output_vector = []
+
+    ref_sample = sampled_stats[baseline_sample]
+
+    for i, sampled_stat in enumerate(sampled_stats):
+        # uncertainty on gini
+        output_vector.append(np.mean(sampled_stat))
+        output_vector.append(np.std(sampled_stat))
+        low, high  = np.quantile(sampled_stat, [alpha, 1-alpha])
+        output_vector.append(low)
+        output_vector.append(high)
+        # uncertainty relative to reference sample
+        output_vector.append(np.mean(sampled_stat/ref_sample))
+        output_vector.append(np.std(sampled_stat/ref_sample))
+        low, high  = np.quantile(sampled_stat/ref_sample, [alpha, 1-alpha])
+        output_vector.append(low)
+        output_vector.append(high)
+        # uncertainty relative to null
+        output_vector.append(np.mean(sampled_stat/null_sample))
+        output_vector.append(np.std(sampled_stat/null_sample))
+        low, high  = np.quantile(sampled_stat/null_sample, [alpha, 1-alpha])
+        output_vector.append(low)
+        output_vector.append(high)
+        # array total and zero
+        this_array = arrays[i]
+        output_vector.append(np.sum(arrays[i]))
+        output_vector.append(np.count_nonzero((this_array-pseudocount) == 0))
+    output_vector.append(total)
+    return output_vector
+
+def multiarray_compare_header(sample_names, ref_sample = 0):
+    out = []
+    out.append("chrm")
+    out.append("start")
+    out.append("end")
+    out.append("strand")
+    out.append("name")
+    for sample in sample_names:
+        out.append(sample + "_mean")
+        out.append(sample + "_std")
+        out.append(sample + "_low")
+        out.append(sample + "_hi")
+        out.append(sample + "_ovr_" + sample_names[ref_sample] + "_mean")
+        out.append(sample + "_ovr_" + sample_names[ref_sample] + "_std")
+        out.append(sample + "_ovr_" + sample_names[ref_sample] + "_low")
+        out.append(sample + "_ovr_" + sample_names[ref_sample] + "_hi")
+        out.append(sample + "_ovr_null" + "_mean")
+        out.append(sample + "_ovr_null" + "_std")
+        out.append(sample + "_ovr_null" + "_low")
+        out.append(sample + "_ovr_null" + "_hi")
+        out.append(sample + "_total")
+        out.append(sample + "_zeros")
+    out.append("sampled_count")
+    header = "\t".join(out)
+    return header + "\n"
+
+def gini_null_method(window, wsize, rng, n_boot = 10000):
+    loc, array = window
+    stat = gini_coefficient(array)
+    median_boot, mad_boot, low, high, pvalue = stat_bootstrapped(array, stat, gini_coefficient, rng, n_boot)
+    total = np.nansum(array)
+    num_zeros = np.count_nonzero(array==0)
+    return [loc, loc+1, stat, median_boot, mad_boot, low, high, pvalue, num_zeros, total]
+
+def gini_null_ratio_method(window, wsize, rng, n_boot = 10000):
+    loc, array = window
+    stat = gini_coefficient(array)
+    mean_boot, std_boot, Z_boot, median_boot, mad_boot, low, high, pvalue, mean_compare, std_compare, median_compare, mad_compare, low_compare, high_compare = stat_bootstrapped_compare(array, stat, gini_coefficient, np.divide, rng, n_boot)
+    total = np.nansum(array)
+    num_zeros = np.count_nonzero(array==0)
+    return [loc, loc+1, stat, median_boot, mad_boot, low, high, pvalue, median_compare, mad_compare, low_compare, high_compare, num_zeros, total]
+
 
 class RegionWindow(object):
     '''
@@ -287,6 +538,17 @@ class RegionWindow(object):
             out.append((self.chrm, abs_coord, abs_coord + 1, self.name, this_value, self.strand, rel_coord, total/len(self.array), total_greater_eq, pvalue))
         return out
 
+
+    def gini_null_ratio_method(self, n_boot = 10000, rng = np.random.default_rng()):
+        out = []
+        array = self.array
+        stat = gini_coefficient(array)
+        mean_boot, std_boot, Z_boot, median_boot, mad_boot, low, high, pvalue, mean_compare, std_compare, median_compare, mad_compare, low_compare, high_compare = stat_bootstrapped_compare(array, stat, gini_coefficient, np.divide, rng, n_boot)
+        total = np.nansum(array)
+        num_zeros = np.count_nonzero(array==0)
+        out.append([self.chrm, self.start, self.end, self.name, stat, self.strand, mean_boot, std_boot, Z_boot, median_boot, mad_boot, low, high, mean_compare, std_compare, median_compare, mad_compare, low_compare, high_compare, num_zeros, total, pvalue])
+        return out
+
     def avg_coverage_filter(self, cutoff):
         """
         Check if the region passes an average coverage cutoff
@@ -308,6 +570,63 @@ class RegionWindow(object):
             True if region frac_zeros is < cutoff
         """
         return np.sum(self.array == 0)/len(self.array) < cutoff
+
+
+class RegionMultiWindow(object):
+    '''
+    Store information about a region in the genome for multiple samples
+
+    Attributes:
+        chrm (str): chromsome region is on
+        start (int): absolute start coordinate
+        end (int): absolute end coordinate
+        strand (str) : strand of region
+        name (str): name of region
+        array (np.array): array of values for the region
+    '''
+    def __init__(self, bed_entry, arrays = None, pseudocount = 1, sample_cov = None):
+        self.chrm = bed_entry["chrm"]
+        self.start = bed_entry["start"]
+        self.end = bed_entry["end"]
+        self.strand = bed_entry["strand"]
+        self.name = bed_entry["name"]
+        self.pseudocount = pseudocount
+        self.sample_cov = sample_cov
+        if arrays is not None:
+            self.add_arrays(arrays)
+            self.get_min_count()
+
+    def add_arrays(self, arrays):
+        """
+        Adds an array to the attributes of the region
+
+        Args:
+            array (np.array): np array of values typically a view
+        """
+        self.arrays = [array[self.chrm][self.start:self.end] + self.pseudocount for array in arrays]
+
+    def get_min_count(self):
+        counts = [np.nansum(array) for array in self.arrays]
+        self.min_count = np.min(counts)
+
+    def GiniCompare(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_compare_stat_bootstrapped(self.arrays, gini_coefficient, 0, total_count, rng, n_boot, alpha, self.pseudocount)
+
+
+def multiarray_bed_regions(arrays_plus, arrays_minus, bed_object, pseudocount = 1, sample_cov = None):
+    for region in bed_object:
+        if region["strand"] == "-":
+            out = RegionMultiWindow(region, arrays_minus, pseudocount = pseudocount, sample_cov = sample_cov)
+        else:
+            out = RegionMultiWindow(region, arrays_plus, pseudocount = pseudocount, sample_cov = sample_cov)
+        yield out
+
+
 
 def bed_regions(arrays, bed_object):
     """ Generate regions using a dictionary of arrays and a bed file
@@ -364,8 +683,15 @@ def multiprocess_poisson(window, rng, *extras):
 def multiprocess_larson(window, rng, *extras):
     return window.larson_method()
 
+def multiprocess_gini_null_ratio(window, rng, bootstraps):
+    return window.gini_null_ratio_method(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multigini(region, rng, bootstraps):
+    return region.GiniCompare(rng = rng, n_boot = bootstraps)
+
 
 def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
+    all_output = []
     for chrm, array in arrays.items():
         filter_keep = initial_filters[chrm]
         filter_keep = create_final_filter(array, args.wsize, args.circular, filter_keep, filters)
@@ -380,8 +706,109 @@ def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
         pool.close()
         pool.join()
         output = [[chrm] + entry for entry in output]
+        all_output += output
+    return all_output
 
-    return output
+def genomewide_gini(args):
+
+    # read in bw files
+    plus_strand = bwtools.pyBigWig.open(args.infile_plus)
+    minus_strand = bwtools.pyBigWig.open(args.infile_minus)
+
+    arrays_plus = bwtools.bigwig_to_arrays(plus_strand, res = 1, nan_to_zero = True)
+    arrays_minus = bwtools.bigwig_to_arrays(minus_strand, res = 1, nan_to_zero = True)
+    
+    # initialize filters for which locations to consider
+    starting_filters= {'+' : {}, '-' : {}}
+
+    # add a way to set problem regions to zero
+    if args.zero_regions is not None:
+        import bed_utils
+        zero_bed = bed_utils.BedFile()
+        zero_bed.from_bed_file(args.zero_regions)
+        for entry in zero_bed:
+            strand = entry['strand']
+            chrm = entry['chrm']
+            start = entry['start']
+            end = entry['end']
+            if strand == "-":
+                arrays_minus[chrm][start:end] = 0
+            else:
+                arrays_plus[chrm][start:end] = 0
+
+    if args.regions is not None:
+        for chrm, array in arrays_plus.items():
+            starting_filters['+'][chrm] = np.zeros(len(array), dtype = bool)
+        for chrm, array in arrays_minus.items():
+            starting_filters['-'][chrm] = np.zeros(len(array), dtype = bool)
+        import bed_utils
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(args.regions) 
+        for entry in inbed:
+            starting_filters[entry['strand']][entry['chrm']][entry['start']:entry['end']] = True
+    else:
+        for chrm, array in arrays_plus.items():
+            starting_filters['+'][chrm] = np.ones(len(array), dtype = bool)
+        for chrm, array in arrays_minus.items():
+            starting_filters['-'][chrm] = np.ones(len(array), dtype = bool)
+
+    # function factory for different methods
+    methods = {'Gini_boot': gini_boot_method,
+               'Gini_null': gini_null_method,
+               'Gini_null_ratio': gini_null_ratio_method}
+
+    # function factory for different filters
+    filters = {'zero': lambda arr: zero_filter(arr, args.wsize, args.zero_cutoff),
+               'avg_cov': lambda arr: avg_coverage_filter(arr, args.wsize, args.avg_cov_cutoff),
+               'cov': lambda arr: coverage_filter(arr, args.wsize, args.cov_cutoff),
+               'max': lambda arr: max_filter(arr, args.wsize),
+               'local_max': lambda arr: local_max_filter(arr, args.wsize)}
+
+    # combine the filters into a filter list
+    if len(args.filters) > 0:
+        all_filters = [filters[val] for val in args.filters]
+    else:
+        all_filters = [lambda arr: True]
+    
+    output_plus = run_tests_over_strand(arrays_plus, methods, all_filters, starting_filters['+'], args)
+    output_minus = run_tests_over_strand(arrays_minus, methods, all_filters, starting_filters['-'], args)
+
+    total_plus = len(output_plus)
+    output = output_plus + output_minus
+    headers = {'Gini_boot': "#chrm\tstart\tend\tname\tGini\tstrand\tboot_stderr\tboot_low\tboot_hi\tnumzeros\ttotal_count\n",
+               'Gini_null': "#chrm\tstart\tend\tname\tGini\tstrand\tnull_median\tnull_mad\tnull_low\tnull_high\tpvalue\tnumzeros\ttotal_count\tqvalue\n",
+               'Gini_null_ratio': "#chrm\tstart\tend\tname\tGini\tstrand\tnull_median\tnull_mad\tnull_low\tnull_high\tpvalue\tratio_median\tratio_mad\tratio_low\tratio_high\tnumzeros\ttotal_count\tqvalue\n"}
+    sys.stdout.write(headers[args.method])
+    if args.method in ['Gini_null', 'Gini_null_ratio']:
+        # filter on pvalues when possible
+        pvals = [out[8] for out in output]
+        if args.no_qvalue: 
+            qval = np.nan
+            strand = "+"
+            for i, (val, pval) in enumerate(zip(output, pvals)):
+                if i >= total_plus:
+                    strand = "-"
+                if pval < args.alpha:
+                    sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(val[0], val[1], val[2], val[3], strand, "\t".join([str(entry) for entry in val[4:]]), qval))
+        else:
+            _, qvals = fdrcorrection(pvals, method = "i")
+            strand = "+"
+            for i, (val, qval) in enumerate(zip(output, qvals)):
+                if i >= total_plus:
+                    strand = "-"
+                if qval < args.alpha:
+                    sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\t%s\n"%(val[0], val[1], val[2], val[3],strand, "\t".join([str(entry) for entry in val[4:]]), qval))
+    else:
+        # The bootstrap method doesn't compare to a null thus doesn't have a p-value
+        for i, val in enumerate(output):
+            if i >= total_plus:
+                strand = "-"
+            else:
+                strand = "+"
+            sys.stdout.write("%s\t%s\t%s\t.\t%s\t%s\t%s\n"%(val[0], val[1], val[2], val[3], strand, "\t".join([str(entry) for entry in val[4:]])))
+    plus_strand.close()
+    minus_strand.close()
+
 
 def genomewide_fast(args):
     
@@ -394,6 +821,23 @@ def genomewide_fast(args):
     
     # initialize filters for which locations to consider
     starting_filters= {'+' : {}, '-' : {}}
+
+
+    # add a way to set problem regions to zero
+
+    if args.zero_regions is not None:
+        import bed_utils
+        zero_bed = bed_utils.BedFile()
+        zero_bed.from_bed_file(args.zero_regions)
+        for entry in zero_bed:
+            strand = entry['strand']
+            chrm = entry['chrm']
+            start = entry['start']
+            end = entry['end']
+            if strand == "-":
+                arrays_minus[chrm][start:end] = 0
+            else:
+                arrays_plus[chrm][start:end] = 0
 
     if args.regions is not None:
         for chrm, array in arrays_plus.items():
@@ -417,12 +861,18 @@ def genomewide_fast(args):
     # function factory for different methods
     methods = {'bootstrap': bootstrap_method,
             'Poisson': poisson_method,
-            'Larson': larson_method}
+            'Larson': larson_method,
+            'Larson_nocenter': larson_nocenter_method,
+            'Larson_robust': larson_robust_method,
+            'Churchman': churchman_method}
 
     headers = {
             'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tsamp_gr_eq\tpvalue\tqvalue\n",
                'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\texp_count\ttotal_count\tpvalue\tqvalue\n",
-               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tpvalue\tqvalue\n"}
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tZscore\tmedian_count\tnum_zeros\tpvalue\tqvalue\n",
+               'Larson_nocenter': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tZscore\tmedian_count\tnum_zeros\tpvalue\tqvalue\n",
+               'Larson_robust': "#chrm\tstart\tend\tname\tcount\tstrand\tmedian_count\tmad_count\tZscore\tnum_zeros\tpvalue\tqvalue\n",
+               'Churchman': "#chrm\tstart\tend\tname\tcount\tstrand\tmean_count\tstd_count\tZscore\tpvalue\tqvalue\n"}
 
     # function factory for different filters
     filters = {'zero': lambda arr: zero_filter(arr, args.wsize, args.zero_cutoff),
@@ -477,11 +927,13 @@ def region_main(args):
     # function factory for different methods
     methods = {'bootstrap': multiprocess_bootstrap,
             'Poisson': multiprocess_poisson,
-            'Larson': multiprocess_larson}
+            'Larson': multiprocess_larson,
+            'Gini_null_ratio': multiprocess_gini_null_ratio}
 
     headers = {'bootstrap': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tsamp_gr_eq\tpvalue\tqvalue\n",
                'Poisson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\texp_count\tpvalue\tqvalue\n",
-               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\tmean\tstdev\tpvalue\tqvalue\n"}
+               'Larson': "#chrm\tstart\tend\tname\tcount\tstrand\trel_coord\tmean\tstdev\tpvalue\tqvalue\n",
+               'Gini_null_ratio': "#chrm\tstart\tend\tname\tgini\tstrand\tmean_boot\tstd_boot\tZ_boot\tmedian_boot\tmad_boot\tlow\thigh\tmean_compare\tstd_compare\tmedian_compare\tmad_compare\tlow_compare\thigh_compare\tnum_zeros\ttotal\tpvalue\tqvalue\n"}
 
     # function factory for different filters
     filters = {'zero': lambda window: window.zero_filter(args.zero_cutoff),
@@ -536,10 +988,73 @@ def region_main(args):
     plus_strand.close()
     minus_strand.close()
 
+
+def Ginicompare_main(args):
+    import bed_utils
+    
+    # read in bw files
+    plus_strand_handles = bwtools.open_multiple_bigwigs(args.infiles_plus)
+    arrays_plus = bwtools.convert_bigwigs_to_arrays(plus_strand_handles, res = 1)
+
+    minus_strand_handles = bwtools.open_multiple_bigwigs(args.infiles_minus)
+    arrays_minus = bwtools.convert_bigwigs_to_arrays(minus_strand_handles, res = 1)
+
+    # read in regions
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(args.bedfile) 
+
+    header = multiarray_compare_header(args.sample_names)
+ 
+    pool = mp.Pool(args.p)
+    output = pool.starmap(multiprocess_multigini, 
+                augment_with_random_state(
+                    multiarray_bed_regions(arrays_plus, arrays_minus, inbed, pseudocount = args.pseudocount, sample_cov = args.samplecov), args))
+    pool.close()
+    pool.join()
+    sys.stdout.write(header)
+    for region, array in zip(inbed, output):
+        region_info = "\t".join([region["chrm"], str(region["start"]), str(region["end"]), region["strand"], region["name"]])
+        output_info = "\t".join(["%s"%(value) for value in array])
+        sys.stdout.write(region_info + "\t" + output_info + "\n")
+
+    bwtools.close_multiple_bigwigs(plus_strand_handles)
+    bwtools.close_multiple_bigwigs(minus_strand_handles)
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser("Python script to call pauses in NET-seq data")
     subparsers = parser.add_subparsers(help = "Supported Commands")
+
+    parser_gini = subparsers.add_parser("Genomewide_gini", help = "Test for uneveness in read distribution")
+    parser_gini.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
+    parser_gini.add_argument('infile_minus', type=str, help = "bigwig file containing raw counts on the minus strand")
+    parser_gini.add_argument('wsize', type = int, help = "Half the window size. Adds to each side of the query bp. I.e. 100 would give you a \
+            total of a 201 bp window with the query bp in the center. Default = 100", default = 100)
+    parser_gini.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
+    parser_gini.add_argument('--method', type = str, help = "Must be one of Gini_boot (bootstrap the Gini estimate) or Gini_null (bootstrap a null multinomial distro). Default = Gini_null",
+            default = "Gini_null")
+    parser_gini.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
+    parser_gini.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
+    parser_gini.add_argument('--filters', type = str, nargs = "+",
+            help = "List of filters to apply before considering windows. Possibilities include: 'zero'- max fraction of zeros in window, 'max',\
+                    'avg_cov'-window must be above an avg coverage, 'cov'-center of window must be above cutoff, 'local_max'- coverage must be higher than neighbors. Default = None",
+            default = [])
+    parser_gini.add_argument('--avg_cov_cutoff', type = float, help = "Cutoff for average coverage filter. Default = 1",
+            default = 1.0)
+    parser_gini.add_argument('--cov_cutoff', type = float, help = "Cutoff for center coverage filter. Default = 1",
+            default = 1.0)
+    parser_gini.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
+            default = 0.1)
+    parser_gini.add_argument('--regions', type = str, help = "Regions to only consider. Ignore anything outside these regions. Default = None",
+            default = None)
+    parser_gini.add_argument('--zero_regions', type = str, help = "Regions to set to zero. Useful for removing known artifacts. Default = None",
+            default = None)
+    parser_gini.add_argument('--resolution', type = int, help = "Roll the windows at what resolution? Default = 1 bp ", default = 1)
+    parser_gini.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
+            default = True)
+    parser_gini.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
+    parser_gini.add_argument('--no_qvalue', action = "store_true", help = "don't do q-value calculations. Use p-value for sig cutoff")
+    parser_gini.set_defaults(func=genomewide_gini)
 
     parser_genome = subparsers.add_parser("Genomewide", help = "Call pauses across the entire genome")
     parser_genome.add_argument('infile_plus', type=str, help = "bigwig file containing raw counts on the plus strand")
@@ -562,6 +1077,8 @@ if __name__ == "__main__":
     parser_genome.add_argument('--zero_cutoff', type = float, help = "Cutoff for fraction of zeros in a window. Default = .10",
             default = 0.1)
     parser_genome.add_argument('--regions', type = str, help = "Regions to only consider. Ignore anything outside these regions. Default = None",
+            default = None)
+    parser_genome.add_argument('--zero_regions', type = str, help = "Regions to set to zero. Useful for removing known artifacts. Default = None",
             default = None)
     parser_genome.add_argument('--circular', type = bool, help = "Consider the genome as circular? Wraps edge windows around end of genome. Default = True",
             default = True)
@@ -589,6 +1106,18 @@ if __name__ == "__main__":
     parser_region.add_argument('--alpha', type = float, help = "q-value cutoff for significance. Default = 0.05", default = 0.05)
     parser_region.add_argument('--no_qvalue', action = "store_true", help = "don't do q-value calculations. Use p-value for sig cutoff")
     parser_region.set_defaults(func=region_main)
+
+    parser_ginicompare = subparsers.add_parser("GiniCompare", help = "Compare pausing across locations")
+    parser_ginicompare.add_argument('bedfile', type=str, help = "bed file containing regions to consider")
+    parser_ginicompare.add_argument('--sample_names', type=str, nargs = "+", help = "names of the samples")
+    parser_ginicompare.add_argument('--infiles_plus', type=str, nargs = "+", help = "bigwig files containing raw counts on the plus strand")
+    parser_ginicompare.add_argument('--infiles_minus', type=str, nargs = "+", help = "bigwig files containing raw counts on the minus strand")
+    parser_ginicompare.add_argument('--p', type = int, help = "Number of processors to use. Default = 1", default = 1)
+    parser_ginicompare.add_argument('--n_boot', type = int, help = "Number of bootstraps to do for bootstrap method. Default = 10000", default = 10000)
+    parser_ginicompare.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
+    parser_ginicompare.add_argument('--pseudocount', type = int, help = "Pseudocount", default = 0)
+    parser_ginicompare.add_argument('--samplecov', type = float, help = "How much coverage depth to sample at", default = None)
+    parser_ginicompare.set_defaults(func=Ginicompare_main)
 
     args = parser.parse_args()
     args.func(args)

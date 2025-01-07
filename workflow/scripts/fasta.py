@@ -17,7 +17,11 @@ def complement(sequence):
     """
     # create a dictionary to act as a mapper
     comp_dict = {'A': 'T', 'G':'C', 'C':'G', 'T': 'A', 'N':'N', '-':'-',
-                  'a':'t', 'g':'c', 'c':'g', 't':'a', 'n':'n'}
+            'a':'t', 'g':'c', 'c':'g', 't':'a', 'n':'n',
+            'Y':'R', 'R':'Y', 'S':'S', 'W':'W', 'K': 'M', 'M':'K',
+            'B':'V', 'V':'B', 'D':'H', 'H':'D',
+            'y':'r', 'r':'y', 's':'s', 'w':'w', 'k': 'm', 'm':'k',
+            'b':'v', 'v':'b', 'd':'h', 'h':'d'}
     # turn the sequence into a list
     sequence = list(sequence)
     # remap it to the compelmentary sequence using the mapping dict

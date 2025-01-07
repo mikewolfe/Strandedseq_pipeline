@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.0.4
+
+### Added
+- Add ability to downsample total reads to match in group normalization
+- Add conversion from bigwig to bedgraph and wig formats
+- Ability to calculate queries at lower resolutions with bwtools
+- Ability to downsample aligned data based on group minimum
+- Gini coefficient calculations for NETseq data
+- Pseudoalignment with Kallisto for stranded data
+- Modeling with Sleuth
+- Seperation of feature counting from modeling
+- Stranded querys with sense and antisense capabilities `bwtools_query_stranded`
+- Stranded spike-in normalization using variety of methods including Bonhoure et
+  al. method and DEseq2 method
+- Deduplication with Picard MarkDuplicates.
+- Ability to set specific locations to zero when doing NETseq pause calling
+- Give background corrected logos in NETseq
+- Specify whether you want sequences pulled for NET-seq pauses or not
+- Ability to plot large logos for NET-seq
+- More pause calling types for NET-seq
+- Ability to skip mark duplicates for bams
+
+### Changes
+- Update versions of some packages including ncbi-acc-download to get around
+  rate filtering issue and multiqc to deal with python updates
+- Enable the ability to choose which QC you want to run
+- Allow fasta files to complement full IUPAC nomenclature i.e. R complements Y.
+
+### Bug fixes
+- Issue with syntax of comparisons in `coverage_and_norm.smk`
+- Issue with using `not input_sample.isnull()` in higher version of snakemake
+- Issue with `bwtools_multiprocessing` not correctly identifying needed input
+  files
+- Fixed issues with sample sheets that do not have a input_sample or only have
+  single end samples
+- Fixed bug in NETseq pause calling that would only report last chromosome
+
 ## 0.0.3
 
 ### Added

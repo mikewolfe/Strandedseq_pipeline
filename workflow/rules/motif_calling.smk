@@ -17,7 +17,7 @@ def determine_motif_calling_files(config, pep):
         motif_caller = lookup_in_config(config, ["motif_calling", model, "motif_caller"], 
         err = "Need motif caller specified for motif_caller model %s in config file. I.e. \nmotif_calling:\n\t%s:\n\t\tmotif_caller: 'macs2'"%(model,model))
         these_samples = filter_samples(pep, \
-        lookup_in_config(config, ["motif_calling", model, "filter"], "not input_sample.isnull()"))
+        lookup_in_config(config, ["motif_calling", model, "filter"], "not sample_name.isnull()"))
         if motif_caller == "streme":
             for sample in these_samples:
                 outfiles.append("results/motif_calling/%s/fimo/%s.tsv"%(model, sample))

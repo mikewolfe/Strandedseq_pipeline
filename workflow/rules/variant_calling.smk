@@ -1,6 +1,6 @@
 def which_samples_to_run(config, pep):
     these_samples = filter_samples(pep,
-    lookup_in_config(config, ["variant_calling", "filter"], "input_sample.isnull()"))
+    lookup_in_config(config, ["variant_calling", "filter"], "not sample_name.isnull()"))
     return ["results/variant_calling/breseq/renamed_output/%s.gd"%sample for sample in these_samples]
 
 rule run_variant_calling:
@@ -58,7 +58,7 @@ def get_references_per_sample(sample, pep, files = "genbanks_only"):
 
 def get_all_refs(pep, files = "genbanks_only"): 
     these_samples = filter_samples(pep,
-    lookup_in_config(config, ["variant_calling", "filter"], "input_sample.isnull()"))
+    lookup_in_config(config, ["variant_calling", "filter"], "not sample_name.isnull()"))
     out_files = set()
     for sample in these_samples:
         [out_files.add(this_file) for this_file in get_references_per_sample(sample, pep, files)]

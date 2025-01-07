@@ -22,7 +22,13 @@ def get_genome_fastas(config, genome):
 def get_genome_annotations(config, genome, ext = "bed"):
     out = []
     for key in lookup_in_config(config, ["reference", genome, "genbanks"]).keys():
-       out.append("results/alignment/process_genbank/%s/%s.%s"%(genome, key, ext))
+        out.append("results/alignment/process_genbank/%s/%s.%s"%(genome, key, ext))
+    if ext == "bed":
+        for val in lookup_in_config(config, ["reference", genome, "beds"], []):
+            out.append(val)
+    if ext == "gff":
+        for val in lookup_in_config(config, ["reference", genome, "gffs"], []):
+            out.append(val)
     return out
 
 def get_bt2_index(sample, pep):
@@ -223,9 +229,17 @@ rule bowtie2_map_se:
         "{params.bowtie2_param_string} 2> {log.stderr} "
         "| samtools view {params.samtools_view_param_string} > {output}"
 
+
+def get_bam_to_sort(sample, config):
+    if lookup_in_config(config, ["alignment", "bam_sort", "markdups"], True):
+        out = "results/alignment/bowtie2/%s_marked.bam"%(sample)
+    else:
+        out = "results/alignment/bowtie2/%s.bam"%(sample)
+    return out
+
 rule bam_sort:
     input:
-        "results/alignment/bowtie2/{sample}.bam"
+        lambda wildcards: get_bam_to_sort(wildcards.sample, config)
     output:
         "results/alignment/bowtie2/{sample}_sorted.bam"
     log:
@@ -247,3 +261,27 @@ rule bam_index:
         "../envs/alignment.yaml"
     shell:
         "samtools index {input} {output} > {log.stdout} 2> {log.stderr}"
+
+
+rule bam_markduplicates:
+    input:
+        "results/alignment/bowtie2/{sample}.bam"
+    output:
+        outbam=temp("results/alignment/bowtie2/{sample}_marked.bam"),
+        outmetrics= "results/alignment/picard/{sample}_dup_metrics.txt"
+
+    log:
+        stdout="results/alignment/logs/picard/{sample}_markdups.log",
+        stderr="results/alignment/logs/picard/{sample}_markdups.err"
+    resources:
+        mem_mb=20000
+    conda:
+        "../envs/alignment.yaml"
+    shell:
+        "picard -Xmx20g MarkDuplicates "
+        "-ASSUME_SORT_ORDER queryname "
+        "-I {input} "
+        "-O {output.outbam} "
+        "-M {output.outmetrics} "
+        "> {log.stdout} "
+        "2> {log.stderr} "

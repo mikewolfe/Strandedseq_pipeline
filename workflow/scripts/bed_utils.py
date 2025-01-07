@@ -107,13 +107,30 @@ class BedFile(object):
         self.data = new_data
 
     def from_bed_file(self, fname, header=0, names=None, dtypes=None):
-        with open(fname, mode="r") as inf:
-            for i in range(header):
-                inf.readline()
-            for line in inf:
-                entry = BedEntry(names=names, dtypes=dtypes)
-                entry.parse_from_line(line)
-                self.data.append(entry)
+        if type(fname) is int or not fname.endswith(".gz"):
+            with open(fname, mode="r") as inf:
+                for i in range(header):
+                    inf.readline()
+                for line in inf:
+                    if line.startswith("#"):
+                        continue
+                    entry = BedEntry(names=names, dtypes=dtypes)
+                    entry.parse_from_line(line)
+                    self.data.append(entry)
+
+        elif fname.endswith(".gz"):
+            import gzip
+            with gzip.open(fname, mode="rt") as inf:
+                for i in range(header):
+                    inf.readline()
+                for line in inf:
+                    if line.startswith("#"):
+                        continue
+                    entry = BedEntry(names=names, dtypes=dtypes)
+                    entry.parse_from_line(line)
+                    self.data.append(entry)
+        else:
+            raise ValueError("Can't figure out input file %s"%fname)
 
     def write_bed_file(self, fname, header=None):
         with open(fname, mode="w") as outf:

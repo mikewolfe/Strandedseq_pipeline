@@ -19,9 +19,14 @@ reference:
             # but you can also add additional contigs that you may want in
             # the final alignment genome by listing them here
             - test/ecoli_rrnD.fa
+            - test/ERCC92.fa
         # This allows you to mask regions by replacing them with Ns. Masked
         # regions need to be specified by a bed file
         masked_regions: test/ecoli_rrns.bed
+        beds:
+            - test/ERCC92.bed
+        gffs:
+            - test/ERCC92.gtf
 
 # Options to control preprocessing rules
 preprocessing:
@@ -83,6 +88,9 @@ alignment:
         samtools_view_param_string:
             value: "-b"
 
+    bam_sort:
+        markdups: false
+
 
 # Options to control genome coverage calculations
 coverage_and_norm:
@@ -94,6 +102,69 @@ coverage_and_norm:
     # Note
     # that bigwigs will not display properly in IGV if they have nans or infs
     dropNaNsandInfs: true
+
+
+    # revamped spike-in normalization using a model-based approach
+
+    # summarizes values by region
+    group_norm:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_samples:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull() and input_sample != ""'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_spike_rpm_sfs"]
+
+        all_samples_downsampled:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull() and input_sample != ""'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_spike_rpm_sfs"]
+            downsample: "yes"
+
+        all_samples_antisense:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull() and input_sample != ""'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            antisense: true
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_spike_rpm_sfs"]
+
+
+        all_samples_no_expected:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull() and input_sample != ""'
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            methods: ["regress_rpm_sfs"]
 
     # rule specific controls
     # Each of these can be specified either as a single value for every sample
@@ -151,6 +222,8 @@ coverage_and_norm:
     bwtools_smooth:
         param_string:
             value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
+
+    ## NOTE NEEDS REVAMP FOR STRANDED DATA
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -177,7 +250,7 @@ coverage_and_norm:
         # How many regions to look at for max scaling
         number_of_regions:
             value: 10
-
+    ## NOTE NEEEDS REVAMP FOR STRANDED DATA
     bwtools_multicompare:
         # Run these models by doing `snakemake --use-conda --cores
         # N run_bwtools_multicompare`.
@@ -224,6 +297,11 @@ coverage_and_norm:
 
 # Options to control quality control
 quality_control:
+    qc_to_run:
+        - "fastqc"
+        - "coverage"
+        - "correlation"
+        - "pe_fragment"
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
     # control how reads are filter for ALL samples
@@ -248,27 +326,10 @@ quality_control:
 # Options to control peak calling
 peak_calling:
     # Can make different models to try out different peak callers or parameters
-    cmarrt_all:
-        # specify the peak caller to use. Currently only support "cmarrt" and "macs2"
-        peak_caller: "cmarrt"
-        # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
-        # Choose which coverage file you want to run the peak caller on
-        filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
-        # Window size is required for cmarrt
-        # Half the size of the window in *entries* thus this would be 25
-        # * 5 bp resolution for a half window size of 125 bp
-        cmarrt_window_size:
-            value: 25
-        # Additional parameters to the calling function can be specified here
-        # Number of entries to consolidate peaks over i.e. two peaks within
-        # 10 * 5bp = 50 bp will get merged into one peak.
-        cmarrt_param_string:
-            value:  "--consolidate 10 --plots"
     macs2_all:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -286,7 +347,7 @@ motif_calling:
         # Which motif caller? Supports meme and streme
         motif_caller: "streme"
         # Which samples to run on?
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which file to run on?
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         # Parameters for the background markov model
@@ -302,7 +363,7 @@ motif_calling:
     # Same thing but running a different motif finder
     macs2_all_meme:
         motif_caller: "meme"
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         get_markov_param_string:
             value: "-dna -m 0"
@@ -326,24 +387,25 @@ variant_calling:
 # Control for the postprocessing submodule
 postprocessing:
     # summarizes values by region
-    bwtools_query:
+    bwtools_query_stranded:
         # Can specify different "models" to run by naming them here
         # Model 1 - look at the full coverage for all genes
         all_genes_cov:
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include
             downstream: 0
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"
@@ -351,12 +413,41 @@ postprocessing:
             # for summarize "identity". Try to do this on a small number of
             # samples of the same type
             calc_spearman: true
+
+        all_genes_antisense_cov:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 1
+            # What resolution to output at. Average data over bins
+            res_to: 50
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+            antisense: True
+            # Calculate spearman correlations between samples? Only make sense
+            # for summarize "identity". Try to do this on a small number of
+            # samples of the same type
+            calc_spearman: true
+
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?
+            filter: 'input_sample != "" and not input_sample.isnull()'
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_minus_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
             # averaging is done over the bins)
@@ -371,20 +462,63 @@ postprocessing:
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 
+
+        all_genes_Gini:
+            # which regions to use?
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "Gini"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+
+        all_genes_antisense_mean:
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "mean"
+            antisense: True
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
         # Model 3 - look at the relative polymerase progression for samples in
         # genotype A
         genotypeA_all_genes_RPP:
             # only consider the samples that have a genotype A. Ensure that they
             # have an associated input sample so that the input samples
             # themselves are not run.
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_plus_median_ratio_querysub.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
@@ -397,16 +531,16 @@ postprocessing:
         # Model 4 - look at the traveling ratio for samples in genotype A
         genotypeA_all_genes_TR:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_minus_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
@@ -418,67 +552,107 @@ postprocessing:
 
         # Model 5 - look at the identified beta peak locations for the traveling
         # ratio
-        genotypeA_all_genes_TR:
+        genotypeA_all_genes_TR_A:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_plus_raw.bw"
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw"
             # Here we want to consider 300 bp upstream in our region as well
             upstream: 300
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
-            res : 5
+            res : 1
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format, single allows for a single number summary)
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summary_func: "TR"
+            summary_func: "TR_B"
+            bwtools_query_params: "--TR_A_center 40 --TR_B_center 200"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 
-        # Model 6 - look at the average strand ratio at each gene
-        all_genes_mean_strand_ratio:
-            # which regions to use?
-            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
-            # which files to use? Note we can use a different set than Model 1
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
-            # what resolution to query data (shouldn't be lower than the
-            # resolution of your file, think of this as a sampling rate, no 
-            # averaging is done over the bins)
-            res : 5
-            # How do you want to summarize your data? (identity gives every data
-            # point in tidy format, single allows for a single number summary)
-            summarize: "single"
-            filter: "input_sample.isnull() or not input_sample.isnull()"
-            # What single number summary do you want (mean, median, max, min,
-            # etc.)
-            # only defined when summarize is "single"
-            summary_func: "mean"
-            # what fraction of NaNs can be in a region and still report a value?
-            frac_na: 0.20
+    bwtools_query:
+         # Model 6 - look at the average strand ratio at each gene
+         all_genes_mean_strand_ratio:
+             # which regions to use?
+             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+             # which files to use? Note we can use a different set than Model 1
+             filesignature: "results/coverage_and_norm/bwtools_compare/%s_log2strandratio.bw"
+             # what resolution to query data (shouldn't be lower than the
+             # resolution of your file, think of this as a sampling rate, no 
+             # averaging is done over the bins)
+             res : 1
+             # How do you want to summarize your data? (identity gives every data
+             # point in tidy format, single allows for a single number summary)
+             summarize: "single"
+             filter: "not sample_name.isnull()"
+             # What single number summary do you want (mean, median, max, min,
+             # etc.)
+             # only defined when summarize is "single"
+             summary_func: "mean"
+             # what fraction of NaNs can be in a region and still report a value?
+             frac_na: 0.20
 
 # Control for NETseq submodule
 NETseq:
     pause_calling:
         test:
             model_type: "Genomewide"
-            NETseq_pause_params: "--method Larson --circular True --filter cov --cov_cutoff 1"
+            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
             filter: "seq_method == 'NETseq'"
             wsize: 100
+            NETseq_logo_params: "--upstream 12 --downstream 5"
+
+        test_mask:
+            model_type: "Genomewide"
+            NETseq_pause_params: "--method Larson --circular True --cov_cutoff 1 --filters 'cov' --no_qvalue --alpha 0.2"
+            filter: "seq_method == 'NETseq'"
+            wsize: 100
+
+        test_gini:
+            model_type: "Gini"
+            NETseq_pause_params: "--method Gini_null_ratio --circular True --cov_cutoff 1 --filters 'cov' --alpha 0.05 --n_boot 2000 --no_qvalue"
+            filter: "seq_method == 'NETseq'"
+            wsize: 100
+
+
+# Control for transcriptome assembly
+# WIP
+
+# Control for counting features
+feature_counting:
+    all_genes:
+        # Parameters to pass to HTseq count
+        HTseq_params: "-s reverse -a 0 -i ID -t gene"
+        # Which features should be counted?
+        regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
 
 # Control for the modeling submodule
 modeling:
     # Specify a specific model you want to run
     by_condition:
+        # Which modeler
+        program: "DESeq2"
         # Which samples?
-        filter: "not input_sample.isnull()"
-        # How should HTseq count features?
-        HTseq_params: "-s reverse -a 0 -i ID -t gene"
+        filter: 'input_sample != "" and not input_sample.isnull()'
+        # Which quantification:
+        count_path: "results/modeling/feature_counting/all_genes/HTseq_readcount/"
+        # Whats the full model?
+        full: "~ genotype"
+        # Whats the reduced model?
+        reduced: "~ 1"
+
+    by_condition_sleuth:
+        # Which modeler
+        program: "sleuth"
+        # Which samples?
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which features should be counted?
-        regions: "results/alignment/combine_gff/U00096.3/U00096.3.gff"
+        genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
+        regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
         # Whats the full model?
         full: "~ genotype"
         # Whats the reduced model?

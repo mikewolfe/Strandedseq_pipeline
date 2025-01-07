@@ -1,5 +1,6 @@
 import fasta
 import bed_utils
+import operator
 
 
 if __name__ == "__main__":
@@ -12,6 +13,9 @@ if __name__ == "__main__":
     parser.add_argument('--upstream', type=int, help = "amount upstream to pad sequence by. Default = 0", default = 0)
     parser.add_argument('--downstream', type=int, help = "amount downstream to pad sequence by. Default = 0", default = 0)
     parser.add_argument('--circular', action = "store_true", help = "treat chromosomes as circular?")
+    parser.add_argument('--filter_column', type = int, help = "0-based column number to filter on. Default = 4", default = 4)
+    parser.add_argument('--filter_value', type = float, help = "cutoff to filter at. Default None (no filter)", default = None)
+    parser.add_argument('--filter_direction', type = str, help = "greater or less, default = greater", default = "greater")
 
     args = parser.parse_args()
     bed_file = args.bed_file
@@ -28,11 +32,22 @@ if __name__ == "__main__":
     with open(fasta_file, mode = "r") as inf:
         genome.read_whole_file(inf)
 
+    if args.filter_value is not None:
+        cutoff_value = args.filter_value
+        direction_factory = {"greater": operator.ge, "less": operator.le}
+        direction = direction_factory[args.filter_direction]
+        filter_func = lambda entry: direction(float(entry[args.filter_column]), cutoff_value)
+    else:
+        filter_func = lambda entry: True
+
+
     for entry in bed:
         this_chrm = entry["chrm"]
         this_start = entry["start"]
         this_end = entry["end"]
         this_strand = entry["strand"]
+        if not filter_func(entry):
+            continue
         if this_strand == "-":
             this_start = this_start - downstream
             this_end = this_end + upstream 
@@ -42,6 +57,12 @@ if __name__ == "__main__":
             this_end = this_end + downstream 
             rc = False
         chrm = genome.pull_entry(this_chrm)
-        seq = chrm.pull_seq(this_start, this_end, rc = rc, circ = args.circular)
+        try:
+            seq = chrm.pull_seq(this_start, this_end, rc = rc, circ = args.circular)
+        except ValueError as err:
+            sys.stderr.write("Replacing with Ns...\n")
+            sys.stderr.write(str(err) + "\n")
+            sys.stdout.write("N"*(this_end-this_start) + "\n")
+            continue
         sys.stdout.write(seq + "\n")
 

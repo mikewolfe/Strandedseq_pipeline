@@ -31,6 +31,14 @@ def determine_postprocessing_files(config):
         for model in config["postprocessing"]["bwtools_query"]:
             if config["postprocessing"]["bwtools_query"][model].get("calc_spearman", False):
                 outfiles.append("results/postprocessing/bwtools_query/"+model + "_spearman.tsv")
+
+    if lookup_in_config(config, ["postprocessing", "bwtools_query_stranded"], ""):
+        outfiles.extend(
+        ["results/postprocessing/bwtools_query_stranded/%s_bwtools_query_stranded.tsv.gz"%model\
+        for model in config["postprocessing"]["bwtools_query_stranded"]])
+        for model in config["postprocessing"]["bwtools_query_stranded"]:
+            if config["postprocessing"]["bwtools_query_stranded"][model].get("calc_spearman", False):
+                outfiles.append("results/postprocessing/bwtools_query_stranded/"+model + "_spearman.tsv")
     return outfiles
 
 
@@ -43,14 +51,14 @@ rule run_postprocessing:
 
 def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio.bw")
     files = [file_sig%(sample) for sample in these_samples]
     return files
 
 def pull_labels_for_deeptools_models(toolname, modelname, config, pep):
-    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    these_samples = filter_samples(pep, lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     return " ".join(these_samples)
 
 rule deeptools_byregion:
@@ -149,6 +157,92 @@ rule deeptools_referencepoint:
         "--sortRegions keep "
         "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr} "
 
+def pull_bws_for_stranded_models(toolname, modelname, config, pep, strand = "plus", ext_or_inp = "ext"):
+    these_samples = filter_samples(pep, \
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
+    file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
+    "results/coverage_and_norm/deeptools_coverage/%s_%s_raw.bw")
+
+    if ext_or_inp == "ext":
+        files = [file_sig%(sample,strand) for sample in these_samples]
+    else: 
+        files = [file_sig%(lookup_sample_metadata(sample, "input_sample", pep),strand) for sample in these_samples]
+
+    return files
+
+def run_antisense(wildcards):
+    antisense = lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "antisense"], False)
+    antisense = str(antisense).lower()
+    if antisense == "true":
+        out = "--antisense"
+    else:
+        out = " "
+    return out
+
+
+def change_resolution_query(config, model):
+    try:
+        out = lookup_in_config(config, ["postprocessing", "bwtools_query", model, "res_to"], None)
+        out = "--res_to %s"%(out)
+    except KeyError as err:
+        out = ""
+    return out
+
+
+def change_resolution_query_stranded(config, model):
+    try:
+        out = lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", model, "res_to"], None)
+        out = "--res_to %s"%(out)
+    except KeyError as err:
+        out = ""
+    return out
+            
+    
+
+rule bwtools_query_stranded:
+    input:
+        inbws= lambda wildcards: pull_bws_for_stranded_models("bwtools_query_stranded",wildcards.model,config, pep, strand = "plus", ext_or_inp = "ext"),
+        inbws_minus= lambda wildcards: pull_bws_for_stranded_models("bwtools_query_stranded",wildcards.model,config, pep, strand = "minus", ext_or_inp = "ext"),
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "regions"], None)
+    output:
+        outtext="results/postprocessing/bwtools_query_stranded/{model}_bwtools_query_stranded.tsv.gz"
+    log:
+        stdout="results/postprocessing/logs/bwtools_query_stranded/{model}.log",
+        stderr="results/postprocessing/logs/bwtools_query_stranded/{model}.err"
+    params:
+        labels = lambda wildcards: pull_labels_for_deeptools_models("bwtools_query_stranded", wildcards.model, config, pep),
+        upstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "downstream"], 0),
+        res = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "res"], 5),
+        summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "summarize"], 'single'),
+        summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "summary_func"], 'mean'),
+        coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "coord"], 'absolute'),
+        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query_stranded", wildcards.model, "frac_na"], 0.25),
+        antisense = lambda wildcards: run_antisense(wildcards),
+        res_to = lambda wildcards: change_resolution_query_stranded(config, wildcards.model)
+    threads:
+        5
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 workflow/scripts/bwtools.py query "
+        "{output.outtext} "
+        "{input.inbws} "
+        "--minus_strand {input.inbws_minus} "
+        "--res {params.res} "
+        "--regions {input.inbed} "
+        "--coords {params.coord} "
+        "--upstream {params.upstream} "
+        "--downstream {params.downstream} "
+        "--samp_names {params.labels} "
+        "--summarize {params.summarize} "
+        "--summary_func {params.summary_func} "
+        "--frac_na {params.frac_na} "
+        "--gzip "
+        "{params.antisense} "
+        "{params.res_to} "
+        "> {log.stdout} 2> {log.stderr} "
+
 
 rule bwtools_query:
     input:
@@ -167,7 +261,8 @@ rule bwtools_query:
         summarize = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summarize"], 'single'),
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
         coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "coord"], 'absolute'),
-        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25)
+        frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25),
+        res_to = lambda wildcards: change_resolution_query(config, wildcards.model)
     threads:
         5
     conda:
@@ -186,16 +281,17 @@ rule bwtools_query:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "--gzip "
+        "{params.res_to} "
         "> {log.stdout} 2> {log.stderr} "
 
 rule spearman_per_gene:
     input:
-        "results/postprocessing/bwtools_query/{model}_bwtools_query.tsv.gz"
+        "results/postprocessing/{toolname}/{model}_{toolname}.tsv.gz"
     output:
-        "results/postprocessing/bwtools_query/{model}_spearman.tsv"
+        "results/postprocessing/{toolname}/{model}_spearman.tsv"
     log:
-        stdout="results/postprocessing/logs/spearman_per_gene/{model}.log",
-        stderr = "results/postprocessing/logs/spearman_per_gene/{model}.err"
+        stdout="results/postprocessing/logs/spearman_per_gene/{toolname}_{model}.log",
+        stderr = "results/postprocessing/logs/spearman_per_gene/{toolname}_{model}.err"
     threads:
         1
     conda:

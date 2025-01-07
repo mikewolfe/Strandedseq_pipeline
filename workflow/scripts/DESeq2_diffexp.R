@@ -20,7 +20,7 @@ HTseq_dir <- args[2]
 outputprefix <- args[3]
 full_model <- args[4]
 reduced_model <- args[5]
-cores <- args[6]
+cores <- as.integer(args[6])
 spike_regions <- args[7]
 if(spike_regions == "NA"){
     spike_regions <- NA

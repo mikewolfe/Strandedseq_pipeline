@@ -14,9 +14,22 @@ def lookup_sample_metadata(sample, key, pep):
     """
     Get sample metadata by key
     """
+    from pandas import isna
     if sample not in pep.sample_table.index:
         raise KeyError("Sample %s not in sample table"%sample)
-    return pep.sample_table.at[sample, key]
+    out = pep.sample_table.at[sample, key]
+    if isna(out) or out == "":
+        raise ValueError("Sample %s has no value at key %s"%(sample, key))
+    return out
+
+def lookup_sample_metadata_default(sample, key, pep, default = None):
+    try: 
+        out = lookup_sample_metadata(sample, key, pep)
+    except ValueError:
+        logger.warning("No value found for sample: '%s' column: '%s'. Defaulting to %s"%(sample, key, default))
+        out = default
+    return out
+        
 
 def match_fastq_to_sample(sample, pair, pep):
     out = lookup_sample_metadata(sample, "file_path", pep)
@@ -29,10 +42,9 @@ def match_fastq_to_sample(sample, pair, pep):
     return out
 
 def determine_single_end(sample, pep):
-    from pandas import isna
     if "filenameR2" in pep.sample_table:
-        r2 = lookup_sample_metadata(sample, "filenameR2", pep)
-        if isna(r2):
+        r2 = lookup_sample_metadata_default(sample, "filenameR2", pep, "")
+        if r2 == "":
             out = True
         else:
             out = False
@@ -151,6 +163,7 @@ include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/bisulfite.smk"
 include: "workflow/rules/NETseq.smk"
 include: "workflow/rules/motif_calling.smk"
+include: "workflow/rules/pseudoalignment.smk"
 include: "workflow/rules/modeling.smk"
 
 
