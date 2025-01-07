@@ -906,7 +906,12 @@ def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = N
                 out_array.append(arrays_plus[this_chrm][left_coord//res:right_coord//res])
         out_array = np.concatenate(out_array)
     else:
-        out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
+        total_size = 0
+        for chrm in contigs:
+            if chrm not in arrays_plus.keys():
+                continue
+            total_size += arrays_plus[chrm].size
+        out_array = np.zeros(total_size*2, float)
         i = 0
         for chrm in contigs:
             arrsize = arrays_plus[chrm].size
@@ -1452,126 +1457,129 @@ def normfactor_main(args):
 
 
     # enrichment based
-    if args.spikecontigs is not None:
-        # stranded version
-        if args.ext_bws_minus is not None:
-            inp_plus_bw_handles = open_multiple_bigwigs(args.inp_bws)
-            inp_plus_bw_arrays = convert_bigwigs_to_arrays(inp_plus_bw_handles, res = args.res)
-
-            inp_minus_bw_handles = open_multiple_bigwigs(args.inp_bws_minus)
-            inp_minus_bw_arrays = convert_bigwigs_to_arrays(inp_minus_bw_handles, res = args.res)
-            regress_resids = []
-            regress_rpm = []
-
-            regress_total = []
-            regress_total_rpm = []
-
-            for ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, inp_plus_bw_arrays, inp_minus_bw_arrays, args.samples):
-                regress_resids.append(get_stranded_regression_estimates(\
-                        scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
-                        args.spikecontigs,
-                        args.expected_regions,
-                        args.res,
-                        antisense = args.antisense))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
-
-
-                regress_total.append(get_stranded_regression_estimates(\
-                        scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
-                        args.spikecontigs,
-                        args.expected_regions,
-                        args.res,
-                        antisense = args.antisense))
-                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
-
-            regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
-            regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
-            lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
-
-            overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
-
-
-            regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples}) 
-            regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name': args.samples})   
-            lib_total_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
-            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': lib_total_scaled, 'sample_name': args.samples})
-
-            overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
+    if not args.skip_regress:
+        if args.spikecontigs is not None:
+            # stranded version
+            if args.ext_bws_minus is not None:
+                inp_plus_bw_handles = open_multiple_bigwigs(args.inp_bws)
+                inp_plus_bw_arrays = convert_bigwigs_to_arrays(inp_plus_bw_handles, res = args.res) 
+                inp_minus_bw_handles = open_multiple_bigwigs(args.inp_bws_minus)
+                inp_minus_bw_arrays = convert_bigwigs_to_arrays(inp_minus_bw_handles, res = args.res)
+                regress_resids = []
+                regress_rpm = []
     
-        # unstranded version
-        else:
-            inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
-            inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
+                regress_total = []
+                regress_total_rpm = []
+    
+                for ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, inp_plus_bw_arrays, inp_minus_bw_arrays, args.samples):
+                    regress_resids.append(get_stranded_regression_estimates(\
+                            scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+                            args.spikecontigs,
+                            args.expected_regions,
+                            args.res,
+                            antisense = args.antisense))
+                    regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+    
+    
+                    regress_total.append(get_stranded_regression_estimates(\
+                            scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                            args.spikecontigs,
+                            args.expected_regions,
+                            args.res,
+                            antisense = args.antisense))
+                    regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
+    
+                regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
+                regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
+                lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
+                regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+    
+                overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+    
+    
+                regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples}) 
+                regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name': args.samples})   
+                lib_total_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
+                regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': lib_total_scaled, 'sample_name': args.samples})
+    
+                overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
+        
+            # unstranded version
+            else:
+                inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
+                inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
+    
+                regress_resids = []
+                regress_rpm = []
+                regress_spike_rpm = []
+    
+                regress_total = []
+                regress_total_rpm = []
+    
+                for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
+                    regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+                            args.spikecontigs,
+                            args.expected_regions,
+                            args.res,
+                            args.upstream,
+                            args.downstream))
+                    regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+                    regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0])
+    
+                    regress_total.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                            scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                            args.spikecontigs,
+                            args.expected_regions,
+                            args.res,
+                            args.upstream,
+                            args.downstream))
+                    regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
+    
+                regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
+                regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})    
+                lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
+                regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+                #spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
+                #regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
+    
+                regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples})
+                regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name':args.samples})
+                total_lib_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
+                regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled, 'sample_name': args.samples})
+                
+                overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+                #overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
+    
+                overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
+                overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
 
-            regress_resids = []
-            regress_rpm = []
-            regress_spike_rpm = []
-
-            regress_total = []
-            regress_total_rpm = []
-
-            for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
-                regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
-                        args.spikecontigs,
-                        args.expected_regions,
-                        args.res,
-                        args.upstream,
-                        args.downstream))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
-                regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0])
-
-                regress_total.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
-                        scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
-                        args.spikecontigs,
-                        args.expected_regions,
-                        args.res,
-                        args.upstream,
-                        args.downstream))
-                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
-
-            regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
-            regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})    
-            lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
-            #spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
-            #regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
-
-            regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples})
-            regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name':args.samples})
-            total_lib_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
-            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled, 'sample_name': args.samples})
-            
-            overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
-            #overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
-
-            overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
 
     overall.to_csv(args.outfile, index = False, sep = "\t", float_format='%.4f')
     
     if args.ext_bws_minus is not None: 
         close_multiple_bigwigs(bw_plus_handles)
         close_multiple_bigwigs(bw_minus_handles)
-        close_multiple_bigwigs(inp_minus_bw_handles)
-        close_multiple_bigwigs(inp_plus_bw_handles)
+        if not args.skip_regress:
+            close_multiple_bigwigs(inp_minus_bw_handles)
+            close_multiple_bigwigs(inp_plus_bw_handles)
     else:
         close_multiple_bigwigs(bw_handles)
-        close_multiple_bigwigs(inp_bw_handles)
+        if not args.skip_regress:
+            close_multiple_bigwigs(inp_bw_handles)
 
 def convert_main(args):
     summary_operation_dict = {"mean": np.nanmean,
@@ -1769,6 +1777,7 @@ if __name__ == "__main__":
     parser_normfactor.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
     parser_normfactor.add_argument("--antisense", action = "store_true", help = "Use antisense instead of sense values for each expected region")
+    parser_normfactor.add_argument("--skip_regress", action = "store_true", help = "Skip regression-based estimates")
     parser_normfactor.set_defaults(func=normfactor_main)
 
 

@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deduplication with Picard MarkDuplicates.
 - Ability to set specific locations to zero when doing NETseq pause calling
 - Give background corrected logos in NETseq
+- Specify whether you want sequences pulled for NET-seq pauses or not
+- Ability to plot large logos for NET-seq
+- More pause calling types for NET-seq
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around

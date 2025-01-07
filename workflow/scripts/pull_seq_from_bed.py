@@ -60,8 +60,9 @@ if __name__ == "__main__":
         try:
             seq = chrm.pull_seq(this_start, this_end, rc = rc, circ = args.circular)
         except ValueError as err:
-            sys.stderr.write("Skipping...\n")
+            sys.stderr.write("Replacing with Ns...\n")
             sys.stderr.write(str(err) + "\n")
+            sys.stdout.write("N"*(this_end-this_start) + "\n")
             continue
         sys.stdout.write(seq + "\n")
 

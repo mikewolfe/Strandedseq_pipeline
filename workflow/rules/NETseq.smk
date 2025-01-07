@@ -4,17 +4,24 @@ def determine_NETseq_pause_output(config, pep):
     for model in lookup_in_config(config, ["NETseq", "pause_calling"], []):
         model_type = lookup_in_config(config, ["NETseq", "pause_calling", model, "model_type"], 
         err = "Need model type specified for pause_calling model %s in config file. I.e. \nNETseq:\n\tpause_calling:\n\t%s:\n\t\tmodel_type: 'Genomewide'"%(model,model))
+        get_seqs = lookup_in_config(config, ["NETseq", "pause_calling", model, "get_pause_seqs"], "true") == "true"
         these_samples = filter_samples(pep, \
         lookup_in_config(config, ["NETseq", "pause_calling", model, "filter"], "not sample_name.isnull()"))
         if model_type == "Genomewide":
             for sample in these_samples:
                 outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
+                if get_seqs:
+                    outfiles.append("results/NETseq/%s_pause/%s/%s_pause_seqs.txt.gz"%(model_type,model,sample))
         elif model_type == "Region":
             for sample in these_samples:
                 outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
+                if get_seqs:
+                    outfiles.append("results/NETseq/%s_pause/%s/%s_pause_seqs.txt.gz"%(model_type,model,sample))
         elif model_type == "Gini":
             for sample in these_samples:
                 outfiles.append("results/NETseq/%s_pause/%s/%s_pause_calls.bed.gz"%(model_type,model,sample))
+                if get_seqs:
+                    outfiles.append("results/NETseq/%s_pause/%s/%s_pause_seqs.txt.gz"%(model_type,model,sample))
         else:
             raise ValueError("Model type %s not supported for NETseq pause calling. Need one of Genomewide or Region"%(model_type))
     return outfiles
@@ -172,6 +179,10 @@ rule NETseq_pause_logo:
     output:
         "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo.pdf",
         "results/NETseq/{model_type}_pause/{model}/{sample}_pause_logo_bg_corrected.pdf",
+    params:
+       NETseq_logo_display_params = lambda wildcards: lookup_in_config(config,\
+       ["NETseq", "pause_calling", wildcards.model, "NETseq_logo_display_params"],
+       "13 5")
 
     log:
         stdout = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.log",
@@ -182,4 +193,4 @@ rule NETseq_pause_logo:
         "../envs/R.yaml"
     shell:
         "Rscript workflow/scripts/NETseq_plot_logo.R {input.seqs} results/NETseq/{wildcards.model_type}_pause/{wildcards.model}/{wildcards.sample}_pause_logo "
-        "{input.bg_model} > {log.stdout}  2> {log.stderr}"
+        "{input.bg_model} {params.NETseq_logo_display_params} > {log.stdout}  2> {log.stderr}"

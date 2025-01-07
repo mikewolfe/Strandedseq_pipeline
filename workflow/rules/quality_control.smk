@@ -65,7 +65,11 @@ rule run_quality_control:
     conda:
         "../envs/quality_control.yaml"
     shell:
-        "multiqc results/ -o results/quality_control/ --config workflow/envs/multiqc_config.yaml"
+        """
+        rm -fr results/quality_control/multiqc_data/;
+        rm -fr results/quality_control/multiqc_report.html/;
+        multiqc results/ -o results/quality_control/ --config workflow/envs/multiqc_config.yaml
+        """
 
 
 ## spike-in QC

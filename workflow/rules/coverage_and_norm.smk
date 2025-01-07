@@ -890,6 +890,7 @@ rule group_norm_table:
         pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "pseudocount"], 0.1),
         spikecontigs = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "spikecontigs"], None),
         spikeregions = lambda wildcards: pull_expected_regions_group_norm_models(wildcards.model, config, pep),
+        extra_args = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "extra_args"], " "),
         res = RES
     threads:
         5
@@ -906,6 +907,7 @@ rule group_norm_table:
         "--inp_bws_minus {input.ininpminusbws} "
         "--pseudocount {params.pseudocount} "
         "--spikecontigs {params.spikecontigs} "
+        "{params.extra_args} "
         "--res {params.res} "
         "{params.spikeregions} "
         "--samples {params.labels} "
