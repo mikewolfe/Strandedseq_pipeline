@@ -22,7 +22,7 @@ rule umi_extract_se:
 
 rule umi_bam_sort:
     input: 
-        inbam="results/alignment/bowtie2/{sample}.bam"
+        inbam="results/alignment/bowtie2/unsorted/{sample}.bam"
     output:
         temp("results/umi_handling/bams/{sample}_sorted.bam")
     log:
