@@ -123,7 +123,7 @@ rule read_qc:
 rule fastqc_raw:
     message: "Running fastqc on raw reads for {wildcards.sample}"
     input:
-       lambda wildcards: match_fastq_to_sample(wildcards.sample, wildcards.pair, pep) 
+       lambda wildcards: match_fastq_to_sample(wildcards.sample, wildcards.pair, pep, check_umi = False) 
     output:
         "results/quality_control/fastqc_raw/{sample}_raw_{pair}_fastqc.html"
     threads: 1

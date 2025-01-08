@@ -60,6 +60,13 @@ preprocessing:
         trim_param_string:
             value: "LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15"
 
+    # extract and use umis for deduplication
+    umi_extract_se:
+        umi_barcode_string:
+            column: umi_barcode
+        umi_params:
+            value: "--extract-method=regex"
+
 # Options to control alignment rules
 alignment:
     process_genbank:

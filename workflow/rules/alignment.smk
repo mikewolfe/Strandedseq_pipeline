@@ -182,7 +182,7 @@ rule bowtie2_map:
         in2="results/preprocessing/trimmomatic/{sample}_trim_paired_R2.fastq.gz",
         bt2_index_file= lambda wildcards: get_bt2_index_file(wildcards.sample,pep)
     output:
-        temp("results/alignment/bowtie2/{sample}.bam")
+        temp("results/alignment/bowtie2/unsorted/{sample}.bam")
     log:
         stderr="results/alignment/logs/bowtie2/{sample}_bt2.log" 
     params:
@@ -208,7 +208,7 @@ rule bowtie2_map_se:
         in1="results/preprocessing/trimmomatic/{sample}_trim_R0.fastq.gz",
         bt2_index_file= lambda wildcards: get_bt2_index_file(wildcards.sample,pep)
     output:
-        temp("results/alignment/bowtie2/{sample}.bam")
+        temp("results/alignment/bowtie2/unsorted/{sample}.bam")
     log:
         stderr="results/alignment/logs/bowtie2/{sample}_bt2.log" 
     params:
@@ -229,12 +229,13 @@ rule bowtie2_map_se:
         "{params.bowtie2_param_string} 2> {log.stderr} "
         "| samtools view {params.samtools_view_param_string} > {output}"
 
-
 def get_bam_to_sort(sample, config):
-    if lookup_in_config(config, ["alignment", "bam_sort", "markdups"], True):
-        out = "results/alignment/bowtie2/%s_marked.bam"%(sample)
+    if lookup_in_config_persample(config, pep, ["preprocessing", "umi_extract_se", "umi_barcode_string"], sample, default = "NA") != "NA":
+        out = "results/umi_handling/umi_dedup/%s_dedup.bam"%(sample)
+    elif lookup_in_config(config, ["alignment", "bam_sort", "markdups"], True):
+        out = "results/alignment/bowtie2/marked/%s_marked.bam"%(sample)
     else:
-        out = "results/alignment/bowtie2/%s.bam"%(sample)
+        out = "results/alignment/bowtie2/unsorted/%s.bam"%(sample)
     return out
 
 rule bam_sort:
@@ -265,9 +266,9 @@ rule bam_index:
 
 rule bam_markduplicates:
     input:
-        "results/alignment/bowtie2/{sample}.bam"
+        "results/alignment/bowtie2/unsorted/{sample}.bam"
     output:
-        outbam=temp("results/alignment/bowtie2/{sample}_marked.bam"),
+        outbam=temp("results/alignment/bowtie2/marked/{sample}_marked.bam"),
         outmetrics= "results/alignment/picard/{sample}_dup_metrics.txt"
 
     log:

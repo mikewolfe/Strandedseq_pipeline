@@ -30,11 +30,13 @@ def lookup_sample_metadata_default(sample, key, pep, default = None):
         out = default
     return out
         
-
-def match_fastq_to_sample(sample, pair, pep):
+def match_fastq_to_sample(sample, pair, pep, check_umi = True):
     out = lookup_sample_metadata(sample, "file_path", pep)
     if pair == "R1" or pair == "R0":
-        out += lookup_sample_metadata(sample, "filenameR1", pep)
+        if check_umi and lookup_in_config_persample(config, pep, ["preprocessing", "umi_extract_se", "umi_barcode_string"], sample, default = "NA") != "NA":
+            out = "results/umi_handling/umi_extract/%s_umi_extract_R0.fastq.gz"%(sample)
+        else:
+            out += lookup_sample_metadata(sample, "filenameR1", pep)
     elif pair == "R2":
         out += lookup_sample_metadata(sample, "filenameR2", pep)
     else:
@@ -153,6 +155,7 @@ def determine_pseudocount(config):
 RES = lookup_in_config(config, ["coverage_and_norm", "resolution"], 5)
 
 # include in several rules here
+include: "workflow/rules/umi_handling.smk"
 include: "workflow/rules/preprocessing.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/coverage_and_norm.smk"
