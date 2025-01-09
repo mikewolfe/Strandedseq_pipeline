@@ -19,10 +19,18 @@ rule bed_to_fasta:
     shell:
         "python workflow/scripts/bed_to_fasta.py {input.to_convert} {input.genome} {output} > {log.stdout} 2> {log.stderr}"
 
+def get_transcriptome_for_kallisto(model, config):
+    t_fasta = lookup_in_config(config, ["modeling", model, "transcriptome_fasta"], default = " ")
+    if t_fasta != " ":
+        out = t_fasta
+    else:
+        out = "results/pseudoalignment/transcriptome/%s_transcriptome.fa"%(model)
+    return out
+
 rule kallisto_index:
     message: "Creating kallisto index for assembly {wildcards.model}"
     input:
-        "results/pseudoalignment/transcriptome/{model}_transcriptome.fa"
+        lambda wildcards: get_transcriptome_for_kallisto(wildcards.model, config)
     output:
         "results/pseudoalignment/kallisto/{model}/kallisto.idx"
     threads: 1

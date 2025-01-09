@@ -627,7 +627,17 @@ NETseq:
 
 
 # Control for transcriptome assembly
-# WIP
+assembly:
+    genotypeAandB:
+        genome: "U00096.3"
+        assembler: "rockhopper"
+        samples:
+            genotypeA:
+                - genotypeA_rep1_ext
+                - genotypeA_rep2_ext
+            genotypeB:
+                - genotypeB_rep1_ext
+                - genotypeB_rep2_ext
 
 # Control for counting features
 feature_counting:
@@ -660,6 +670,18 @@ modeling:
         # Which features should be counted?
         genome_fasta: "results/alignment/combine_fasta/U00096.3/U00096.3.fa"
         regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+        # Whats the full model?
+        full: "~ genotype"
+        # Whats the reduced model?
+        reduced: "~ 1"
+
+    assembly_by_condition_sleuth:
+        # Which modeler
+        program: "sleuth"
+        # Which samples?
+        filter: 'input_sample != "" and not input_sample.isnull()'
+        # Which features should be counted?
+        transcriptome_fasta: "results/assembly/genotypeAandB/assembled_transcriptome.fa"
         # Whats the full model?
         full: "~ genotype"
         # Whats the reduced model?
