@@ -2,7 +2,7 @@ rule umi_extract_se:
     input:
         in1=lambda wildcards: match_fastq_to_sample(wildcards.sample, 'R0', pep, check_umi = False)
     output:
-        out1=temp("results/umi_handling/umi_extract/{sample}_umi_extract_R0.fastq.gz"),
+        out1="results/umi_handling/umi_extract/{sample}_umi_extract_R0.fastq.gz",
         out2="results/umi_handling/umi_extract/{sample}_umi_extract_R0_noumi.fastq.gz"
     params:
         umi_barcode_string = lambda wildcards: lookup_in_config_persample(config, pep, \

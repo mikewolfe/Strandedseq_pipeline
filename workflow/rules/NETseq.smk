@@ -182,7 +182,7 @@ rule NETseq_pause_logo:
     params:
        NETseq_logo_display_params = lambda wildcards: lookup_in_config(config,\
        ["NETseq", "pause_calling", wildcards.model, "NETseq_logo_display_params"],
-       "13 5")
+       "12 5")
 
     log:
         stdout = "results/NETseq/logs/{model_type}_pause/{model}_{sample}_pause_logo.log",
