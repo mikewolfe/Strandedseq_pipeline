@@ -302,6 +302,41 @@ def gini_coefficient(data, unbiased = False):
         stat = stat/n
     return stat
 
+
+def pause_per_kb(data, wsize=100, Zscore_cutoff = 4):
+    '''
+    Calculate pauses per kb of a region
+    Uses Larson_nocenter method to call pauses
+
+    '''
+    total_pauses = 0
+    for loc, array in generate_windows(data, wsize, np.ones(len(data), dtype=bool)):
+        bkg_array = np.concatenate((array[:wsize], array[wsize+1:])) 
+        mean = np.mean(bkg_array)
+        stdev = np.std(bkg_array)
+        center_value = array[wsize]
+        Zscore = (center_value - mean)/stdev
+        if Zscore > Zscore_cutoff:
+            total_pauses += 1
+    stat = (total_pauses/(len(data)/1000))
+
+    return stat
+
+def pause_per_kb_multi(data, Zscore_cutoff = 4):
+    '''
+    Calculate pauses per kb of a region
+    Estimates pause calling from multinomial
+
+    '''
+    total_pauses = 0
+    total = np.sum(data)
+    length = len(data)
+    expected = total/length
+    sigma = np.sqrt(expected*(1-(1/length)))
+    stat = np.sum((data - expected)/sigma > Zscore_cutoff)
+    stat = (stat/length)*1000
+    return stat
+
 def gini_boot_method(window, wsize, rng, n_boot = 10000):
     loc, array = window
     stat = gini_coefficient(array)
@@ -617,6 +652,22 @@ class RegionMultiWindow(object):
         # make the assumption that the first array is the reference sample always
         return multiarray_compare_stat_bootstrapped(self.arrays, gini_coefficient, 0, total_count, rng, n_boot, alpha, self.pseudocount)
 
+    def PausePerKb(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_compare_stat_bootstrapped(self.arrays, pause_per_kb, 0, total_count, rng, n_boot, alpha, self.pseudocount)
+
+    def PausePerKb_multi(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount)
+
 
 def multiarray_bed_regions(arrays_plus, arrays_minus, bed_object, pseudocount = 1, sample_cov = None):
     for region in bed_object:
@@ -688,6 +739,12 @@ def multiprocess_gini_null_ratio(window, rng, bootstraps):
 
 def multiprocess_multigini(region, rng, bootstraps):
     return region.GiniCompare(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb(region, rng, bootstraps):
+    return region.PausePerKb(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_multi(region, rng, bootstraps):
+    return region.PausePerKb_multi(rng = rng, n_boot = bootstraps)
 
 
 def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
@@ -1004,9 +1061,13 @@ def Ginicompare_main(args):
     inbed.from_bed_file(args.bedfile) 
 
     header = multiarray_compare_header(args.sample_names)
+
+    function_factory = {"Gini": multiprocess_multigini,
+                        "PausePerKb": multiprocess_multiPausePerKb,
+                        "PausePerKb_multi": multiprocess_multiPausePerKb_multi}
  
     pool = mp.Pool(args.p)
-    output = pool.starmap(multiprocess_multigini, 
+    output = pool.starmap(function_factory[args.metric], 
                 augment_with_random_state(
                     multiarray_bed_regions(arrays_plus, arrays_minus, inbed, pseudocount = args.pseudocount, sample_cov = args.samplecov), args))
     pool.close()
@@ -1117,6 +1178,7 @@ if __name__ == "__main__":
     parser_ginicompare.add_argument('--seed', type = int, help = "Random number generator starting seed for reproducibility. Default = 42", default = 42)
     parser_ginicompare.add_argument('--pseudocount', type = int, help = "Pseudocount", default = 0)
     parser_ginicompare.add_argument('--samplecov', type = float, help = "How much coverage depth to sample at", default = None)
+    parser_ginicompare.add_argument('--metric', type = str, help = "Which metric to use (Gini or PausePerKb) default = Gini", default = "Gini")
     parser_ginicompare.set_defaults(func=Ginicompare_main)
 
     args = parser.parse_args()
