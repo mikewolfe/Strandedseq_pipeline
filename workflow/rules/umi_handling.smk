@@ -61,6 +61,8 @@ rule umi_dedup:
         stderr="results/umi_handling/logs/umi_dedup/{sample}_umi_dedup.err",
     conda:
         "../envs/umi_handling.yaml"
+    threads:
+        20
     shell:
-        "umi_tools dedup -I {input.inbam} --output-stats={params.stats}  "
-        "-S {output.outbam} > {log.stdout} 2> {log.stderr}"
+        "umi_tools dedup -I {input.inbam} "
+        "-S {output.outbam} --method=unique > {log.stdout} 2> {log.stderr}"
