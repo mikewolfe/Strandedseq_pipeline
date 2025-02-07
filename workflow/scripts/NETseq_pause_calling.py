@@ -89,6 +89,37 @@ def generate_windows(array, wsize, filter_keep, circular = False):
         else:
             yield (loc, array[start:end])
 
+def generate_windows_nofilter(array, wsize, circular = False):
+    """ A generator for created windows of a specified size across an array
+
+    Options to consider arrays that are circular
+    
+    Args:
+        array - array under consideration
+        wsize - half the wsize to consider around each location
+        circular - consider this array as circular?
+
+    Yields:
+        an array of size wsize*2 + 1 centered at each location in the array. 
+    """
+    array_length = len(array)
+    for loc in np.arange(0, array_length):
+        start = loc - wsize
+        end = loc + wsize + 1
+        if start < 0:
+            if circular:
+                yield (loc, np.concatenate((array[start:], array[:end])))
+            else:
+                continue
+        elif end >= array_length:
+            if circular:
+                yield (loc, np.concatenate((array[start:], array[:(end - array_length)])))
+            else:
+                continue
+        else:
+            yield array[start:end]
+
+
 
 def larson_method(window, wsize, *extra, no_center = False):
     """ Calculate rarity of seeing center value 
@@ -302,6 +333,16 @@ def gini_coefficient(data, unbiased = False):
         stat = stat/n
     return stat
 
+def windowed_gini(data, wsize=100):
+    '''
+    Calculated rolling window of ginis for each position in array
+    '''
+    out = []
+    for window in generate_windows_nofilter(data, wsize):
+        out.append(gini_coefficient(window))
+    out = np.array(out)
+    return out
+
 
 def pause_per_kb(data, wsize=100, Zscore_cutoff = 4):
     '''
@@ -380,14 +421,81 @@ def stat_bootstrapped_compare(array, true_val, stat_func, compare_func, rng, n_b
     mad_compare = sci_stats.median_abs_deviation(compared_samples)
     return [mean_boot, std_boot, Z_boot,median_boot, mad_boot, low, high, pvalue, mean_compare, std_compare, median_compare, mad_compare, low_compare, high_compare]
 
-def multiarray_compare_stat_bootstrapped(arrays, stat_func, baseline_sample, total, rng, n_boot = 1000, alpha = 0.05, pseudocount = 1):
+
+def downsample_array(array, total_count, rng, replace = False):
+    # Create a list of indices based on the counts in the array
+    indices = np.repeat(np.arange(len(array)), array)
+
+    # Sample without replacement from the indices
+    sampled_indices = rng.choice(indices, total_count, replace=replace)
+ 
+    # Create the downsampled array using np.bincount for efficiency
+    downsampled_array = np.bincount(sampled_indices, minlength=len(array))
+
+    return downsampled_array
+
+def multiarray_compare_stat_bootstrapped(arrays, stat_func, baseline_sample, total, rng, n_boot = 1000, alpha = 0.05, pseudocount = 1, include_null_columns = True):
     arr_size = arrays[0].size
     sampled_stats = []
     for array in arrays:
-        sampled_array = rng.multinomial(total, array/np.sum(array), size = n_boot)
+        this_array = array + pseudocount
+        sampled_array = rng.multinomial(total, this_array/np.sum(this_array), size = n_boot)
         sampled_stats.append(np.apply_along_axis(stat_func, 1, sampled_array))
-    null_sampled_array = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
-    null_sample = np.apply_along_axis(stat_func, 1, null_sampled_array)
+    if include_null_columns:
+        null_sampled_array = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+        null_sample = np.apply_along_axis(stat_func, 1, null_sampled_array)
+
+    output_vector = []
+
+    ref_sample = sampled_stats[baseline_sample]
+
+    for i, sampled_stat in enumerate(sampled_stats):
+        # uncertainty on gini
+        output_vector.append(np.mean(sampled_stat))
+        output_vector.append(np.std(sampled_stat))
+        low, high  = np.quantile(sampled_stat, [alpha, 1-alpha])
+        output_vector.append(low)
+        output_vector.append(high)
+        # uncertainty relative to reference sample
+        ratio = sampled_stat/ref_sample
+        output_vector.append(np.mean(ratio))
+        output_vector.append(np.std(ratio))
+        low, high  = np.quantile(ratio, [alpha, 1-alpha])
+        output_vector.append(low)
+        output_vector.append(high)
+        # uncertainty relative to null
+        if include_null_columns:
+            output_vector.append(np.mean(sampled_stat/null_sample))
+            output_vector.append(np.std(sampled_stat/null_sample))
+            low, high  = np.quantile(sampled_stat/null_sample, [alpha, 1-alpha])
+            output_vector.append(low)
+            output_vector.append(high)
+        # array total and zero
+        output_vector.append(np.sum(arrays[i]))
+        output_vector.append(np.count_nonzero((arrays[i]) == 0))
+    output_vector.append(total)
+    return output_vector
+
+def multiarray_dwnsample_compare_stat_bootstrapped(arrays, stat_func, baseline_sample, total, rng, n_boot = 1000, alpha = 0.05, pseudocount = 1, include_null_columns = True, multi_sample = True, bootstrap_est = True):
+    arr_size = arrays[0].size
+    sampled_stats = []
+    for array in arrays: 
+        sampled_array = np.zeros((n_boot, len(array)), dtype="float32")
+        for bootstrap in np.arange(0, n_boot):
+            this_array = downsample_array(array, total, rng)
+            this_array += pseudocount
+            if bootstrap_est:
+                if multi_sample:
+                    sampled_array[bootstrap,:] = rng.multinomial(total, this_array/np.sum(this_array), size = 1)
+                else:
+                    sampled_array[bootstrap,:] = downsample_array(this_array, total, rng, replace = True)
+            else:
+                sampled_array[bootstrap,:] = this_array
+        sampled_stats.append(np.apply_along_axis(stat_func, 1, sampled_array))
+
+    if include_null_columns:
+        null_sampled_array = rng.multinomial(total, [1/arr_size]*arr_size, size = n_boot)
+        null_sample = np.apply_along_axis(stat_func, 1, null_sampled_array)
     
     output_vector = []
 
@@ -401,25 +509,59 @@ def multiarray_compare_stat_bootstrapped(arrays, stat_func, baseline_sample, tot
         output_vector.append(low)
         output_vector.append(high)
         # uncertainty relative to reference sample
-        output_vector.append(np.mean(sampled_stat/ref_sample))
-        output_vector.append(np.std(sampled_stat/ref_sample))
-        low, high  = np.quantile(sampled_stat/ref_sample, [alpha, 1-alpha])
+        ratio = sampled_stat/ref_sample
+        #ratio = ratio[np.isfinite(ratio)]
+        output_vector.append(np.mean(ratio))
+        output_vector.append(np.std(ratio))
+        low, high  = np.quantile(ratio, [alpha, 1-alpha])
         output_vector.append(low)
         output_vector.append(high)
         # uncertainty relative to null
-        output_vector.append(np.mean(sampled_stat/null_sample))
-        output_vector.append(np.std(sampled_stat/null_sample))
-        low, high  = np.quantile(sampled_stat/null_sample, [alpha, 1-alpha])
-        output_vector.append(low)
-        output_vector.append(high)
+        if include_null_columns:
+            output_vector.append(np.mean(sampled_stat/null_sample))
+            output_vector.append(np.std(sampled_stat/null_sample))
+            low, high  = np.nanquantile(sampled_stat/null_sample, [alpha, 1-alpha])
+            output_vector.append(low)
+            output_vector.append(high)
         # array total and zero
-        this_array = arrays[i]
         output_vector.append(np.sum(arrays[i]))
-        output_vector.append(np.count_nonzero((this_array-pseudocount) == 0))
+        output_vector.append(np.count_nonzero((arrays[i]) == 0))
     output_vector.append(total)
     return output_vector
 
-def multiarray_compare_header(sample_names, ref_sample = 0):
+
+def multiarray_stat(arrays, stat_func, baseline_sample, total_count, rng, dwnsample = False, include_extras = True):
+    '''
+    Calculate stats for multiple arrays for one region
+    '''
+    # all arrays are the same size so get the size of the first array
+    arr_size = arrays[0].size
+    # List to hold the output
+    stats = []
+    # calculate a stat for each array
+    for i, array in enumerate(arrays): 
+        if dwnsample:
+            this_array = downsample_array(array, total_count, rng)
+        else:
+            this_array = array
+        this_total = np.sum(this_array)
+        stats.append(stat_func(this_array))
+
+    output_vector = []
+    
+    # add some extra stats to the stat vector
+    for i, stat in enumerate(stats):
+        # stat
+        output_vector.append(stat)
+        if include_extras:
+            # array total and zero
+            output_vector.append(np.sum(arrays[i]))
+            output_vector.append(np.count_nonzero((arrays[i]) == 0))
+    if include_extras:
+        output_vector.append(this_total)
+    return output_vector
+
+def multiarray_compare_header(sample_names, ref_sample = 0, include_null_columns = True):
     out = []
     out.append("chrm")
     out.append("start")
@@ -435,13 +577,32 @@ def multiarray_compare_header(sample_names, ref_sample = 0):
         out.append(sample + "_ovr_" + sample_names[ref_sample] + "_std")
         out.append(sample + "_ovr_" + sample_names[ref_sample] + "_low")
         out.append(sample + "_ovr_" + sample_names[ref_sample] + "_hi")
-        out.append(sample + "_ovr_null" + "_mean")
-        out.append(sample + "_ovr_null" + "_std")
-        out.append(sample + "_ovr_null" + "_low")
-        out.append(sample + "_ovr_null" + "_hi")
+        if include_null_columns:
+            out.append(sample + "_ovr_null" + "_mean")
+            out.append(sample + "_ovr_null" + "_std")
+            out.append(sample + "_ovr_null" + "_low")
+            out.append(sample + "_ovr_null" + "_hi")
         out.append(sample + "_total")
         out.append(sample + "_zeros")
     out.append("sampled_count")
+    header = "\t".join(out)
+    return header + "\n"
+
+def multiarray_stat_header(sample_names, ref_sample = 0, include_extras = True):
+    out = []
+    out.append("chrm")
+    out.append("start")
+    out.append("end")
+    out.append("strand")
+    out.append("name")
+    for sample in sample_names:
+        out.append(sample + "_stat")
+        if include_extras:
+            out.append(sample + "_total")
+            out.append(sample + "_zeros")
+
+    if include_extras:
+        out.append("sampled_count")
     header = "\t".join(out)
     return header + "\n"
 
@@ -619,14 +780,16 @@ class RegionMultiWindow(object):
         name (str): name of region
         array (np.array): array of values for the region
     '''
-    def __init__(self, bed_entry, arrays = None, pseudocount = 1, sample_cov = None):
+    def __init__(self, bed_entry, arrays = None, pseudocount = 1, sample_cov = None, Zscorecutoff = 4, wsize=100, start_padding = 0, end_padding = 0):
         self.chrm = bed_entry["chrm"]
-        self.start = bed_entry["start"]
-        self.end = bed_entry["end"]
+        self.start = bed_entry["start"] - start_padding
+        self.end = bed_entry["end"] + end_padding
         self.strand = bed_entry["strand"]
         self.name = bed_entry["name"]
         self.pseudocount = pseudocount
         self.sample_cov = sample_cov
+        self.Zscorecutoff = Zscorecutoff
+        self.wsize = wsize
         if arrays is not None:
             self.add_arrays(arrays)
             self.get_min_count()
@@ -638,7 +801,7 @@ class RegionMultiWindow(object):
         Args:
             array (np.array): np array of values typically a view
         """
-        self.arrays = [array[self.chrm][self.start:self.end] + self.pseudocount for array in arrays]
+        self.arrays = [array[self.chrm][self.start:self.end].astype(int)  for array in arrays]
 
     def get_min_count(self):
         counts = [np.nansum(array) for array in self.arrays]
@@ -666,15 +829,71 @@ class RegionMultiWindow(object):
         else:
             total_count = self.min_count
         # make the assumption that the first array is the reference sample always
-        return multiarray_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount)
+        return multiarray_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount, include_null_columns = False)
+
+    def PausePerKb_multi_dwnsample(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_dwnsample_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount, include_null_columns = False)
+
+    def PausePerKb_dwn_dwnsample(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_dwnsample_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount, include_null_columns = False, multi_sample = False)
+
+    def PausePerKb_dwnsample(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        total_count = self.min_count
+        # make the assumption that the first array is the reference sample always
+        return multiarray_dwnsample_compare_stat_bootstrapped(self.arrays, pause_per_kb_multi, 0, total_count, rng, n_boot, alpha, self.pseudocount, include_null_columns = False, bootstrap_est = False)
 
 
-def multiarray_bed_regions(arrays_plus, arrays_minus, bed_object, pseudocount = 1, sample_cov = None):
+    def PausePerKb_simple(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        def stat_func(x):
+            return pause_per_kb_multi(x, self.Zscorecutoff)
+        # make the assumption that the first array is the reference sample always
+        return multiarray_stat(self.arrays, pause_per_kb_multi, 0, total_count, rng,dwnsample = False)
+
+    def PausePerKb_dwnsample_simple(self, n_boot = 10000, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        def stat_func(x):
+            return pause_per_kb_multi(x, self.Zscorecutoff)
+        # make the assumption that the first array is the reference sample always
+        return multiarray_stat(self.arrays, stat_func, 0, total_count, rng,dwnsample = True)
+
+    def WindowedGini(self, n_boot = 1, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        def stat_func(x):
+            return windowed_gini(x, self.wsize)
+
+        return multiarray_stat(self.arrays, stat_func, 0, total_count, rng,dwnsample = True, include_extras = False)
+
+
+
+
+
+def multiarray_bed_regions(arrays_plus, arrays_minus, bed_object, pseudocount = 1, sample_cov = None, Zscorecutoff = 4, wsize = 100, upstream = 0, downstream = 0):
     for region in bed_object:
         if region["strand"] == "-":
-            out = RegionMultiWindow(region, arrays_minus, pseudocount = pseudocount, sample_cov = sample_cov)
+            start_padding = downstream
+            end_padding = upstream
+            out = RegionMultiWindow(region, arrays_minus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, end_padding = end_padding)
         else:
-            out = RegionMultiWindow(region, arrays_plus, pseudocount = pseudocount, sample_cov = sample_cov)
+            start_padding = upstream
+            end_padding = downstream
+            out = RegionMultiWindow(region, arrays_plus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, start_padding = start_padding)
         yield out
 
 
@@ -745,6 +964,24 @@ def multiprocess_multiPausePerKb(region, rng, bootstraps):
 
 def multiprocess_multiPausePerKb_multi(region, rng, bootstraps):
     return region.PausePerKb_multi(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_multi_dwnsample(region, rng, bootstraps):
+    return region.PausePerKb_multi_dwnsample(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_dwn_dwnsample(region, rng, bootstraps):
+    return region.PausePerKb_dwn_dwnsample(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_dwnsample(region, rng, bootstraps):
+    return region.PausePerKb_dwnsample(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_simple(region, rng, bootstraps):
+    return region.PausePerKb_simple(rng = rng, n_boot = bootstraps)
+
+def multiprocess_multiPausePerKb_dwnsample_simple(region, rng, bootstraps):
+    return region.PausePerKb_dwnsample_simple(rng = rng, n_boot = bootstraps)
+
+def multiprocess_windowedgini_simple(region, rng, bootstraps):
+    return region.WindowedGini(rng = rng, n_boot = bootstraps)
 
 
 def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
@@ -1059,24 +1296,44 @@ def Ginicompare_main(args):
     # read in regions
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(args.bedfile) 
-
-    header = multiarray_compare_header(args.sample_names)
-
+    if args.metric == "PausePerKb_multi" or args.metric == "PausePerKb_multi_dwnsample" or args.metric == "PausePerKb_dwn_dwnsample" or args.metric == "PausePerKb_dwnsample":
+        header = multiarray_compare_header(args.sample_names, include_null_columns = False)
+    elif args.metric == "PausePerKb_simple" or args.metric == "PausePerKb_dwnsample_simple":
+        header = multiarray_stat_header(args.sample_names)
+    elif args.metric == "WindowedGini":
+        header = multiarray_stat_header(args.sample_names, include_extras = False)
+    else:
+        header = multiarray_compare_header(args.sample_names, include_null_columns = True)
+ 
     function_factory = {"Gini": multiprocess_multigini,
                         "PausePerKb": multiprocess_multiPausePerKb,
-                        "PausePerKb_multi": multiprocess_multiPausePerKb_multi}
+                        "PausePerKb_multi": multiprocess_multiPausePerKb_multi,
+                        "PausePerKb_multi_dwnsample": multiprocess_multiPausePerKb_multi_dwnsample,
+                        "PausePerKb_dwn_dwnsample": multiprocess_multiPausePerKb_dwn_dwnsample,
+                        "PausePerKb_dwnsample": multiprocess_multiPausePerKb_dwnsample,
+                        "PausePerKb_simple": multiprocess_multiPausePerKb_simple,
+                        "PausePerKb_dwnsample_simple": multiprocess_multiPausePerKb_dwnsample_simple,
+                        "WindowedGini": multiprocess_windowedgini_simple}
  
     pool = mp.Pool(args.p)
     output = pool.starmap(function_factory[args.metric], 
                 augment_with_random_state(
-                    multiarray_bed_regions(arrays_plus, arrays_minus, inbed, pseudocount = args.pseudocount, sample_cov = args.samplecov), args))
+                    multiarray_bed_regions(arrays_plus, arrays_minus, inbed, pseudocount = args.pseudocount, sample_cov = args.samplecov, Zscorecutoff = args.Zscorecutoff, wsize = args.wsize, upstream = args.wsize, downstream = args.wsize), args))
     pool.close()
     pool.join()
     sys.stdout.write(header)
     for region, array in zip(inbed, output):
-        region_info = "\t".join([region["chrm"], str(region["start"]), str(region["end"]), region["strand"], region["name"]])
-        output_info = "\t".join(["%s"%(value) for value in array])
-        sys.stdout.write(region_info + "\t" + output_info + "\n")
+        if len(array[0]) == 1:
+            region_info = "\t".join([region["chrm"], str(region["start"]), str(region["end"]), region["strand"], region["name"]])
+            output_info = "\t".join(["%s"%(value) for value in array])
+            sys.stdout.write(region_info + "\t" + output_info + "\n")
+        elif len(array[0]) > 1:
+            for pos in range(0, len(array[0])):
+                region_info = "\t".join([region["chrm"], str(region["start"] + pos), str(region["start"] + pos + 1), region["strand"], region["name"]])
+                output_info = "\t".join(["%s"%(value[pos]) for value in array])
+                sys.stdout.write(region_info + "\t" + output_info + "\n")
+        else:
+            raise ValueError("Output array dimension doesn't make sense %s"%(array.ndim))
 
     bwtools.close_multiple_bigwigs(plus_strand_handles)
     bwtools.close_multiple_bigwigs(minus_strand_handles)
@@ -1179,6 +1436,8 @@ if __name__ == "__main__":
     parser_ginicompare.add_argument('--pseudocount', type = int, help = "Pseudocount", default = 0)
     parser_ginicompare.add_argument('--samplecov', type = float, help = "How much coverage depth to sample at", default = None)
     parser_ginicompare.add_argument('--metric', type = str, help = "Which metric to use (Gini or PausePerKb) default = Gini", default = "Gini")
+    parser_ginicompare.add_argument('--Zscorecutoff', type = float, help = "What Zscore cutoff to use", default = 4)
+    parser_ginicompare.add_argument('--wsize', type = int, help = "Window size for windowed gini. Also pads each array by size", default = 0)
     parser_ginicompare.set_defaults(func=Ginicompare_main)
 
     args = parser.parse_args()
