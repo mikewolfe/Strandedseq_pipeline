@@ -81,7 +81,7 @@ def generate_windows(array, wsize, filter_keep, circular = False):
                 yield (loc, np.concatenate((array[start:], array[:end])))
             else:
                 continue
-        elif end >= array_length:
+        elif end > array_length:
             if circular:
                 yield (loc, np.concatenate((array[start:], array[:(end - array_length)])))
             else:
@@ -111,7 +111,7 @@ def generate_windows_nofilter(array, wsize, circular = False):
                 yield (loc, np.concatenate((array[start:], array[:end])))
             else:
                 continue
-        elif end >= array_length:
+        elif end > array_length:
             if circular:
                 yield (loc, np.concatenate((array[start:], array[:(end - array_length)])))
             else:
@@ -340,6 +340,32 @@ def windowed_gini(data, wsize=100):
     out = []
     for window in generate_windows_nofilter(data, wsize):
         out.append(gini_coefficient(window))
+    out = np.array(out)
+    return out
+
+
+def windowed_gini_null_ratio(data, rng, wsize=100):
+    '''
+    Calculated rolling window of ginis for each position in array
+    '''
+    out = []
+    for window in generate_windows_nofilter(data, wsize):
+        total = np.sum(window)
+        arr_size = len(window)
+        sampled_window = rng.multinomial(total, [1/arr_size]*arr_size, size = 1).flatten()
+        null_gini = gini_coefficient(sampled_window)
+        actual_gini = gini_coefficient(window)
+        out.append(actual_gini / null_gini)
+    out = np.array(out)
+    return out
+
+def windowed_pauseperkb(data, wsize=100):
+    '''
+    Calculated rolling window of ginis for each position in array
+    '''
+    out = []
+    for window in generate_windows_nofilter(data, wsize):
+        out.append(pause_per_kb_multi(window))
     out = np.array(out)
     return out
 
@@ -880,6 +906,26 @@ class RegionMultiWindow(object):
 
         return multiarray_stat(self.arrays, stat_func, 0, total_count, rng,dwnsample = True, include_extras = False)
 
+    def WindowedPausePerKb(self, n_boot = 1, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        def stat_func(x):
+            return windowed_pauseperkb(x, self.wsize)
+
+        return multiarray_stat(self.arrays, stat_func, 0, total_count, rng,dwnsample = True, include_extras = False)
+
+    def WindowedGiniNullRatio(self, n_boot = 1, rng = np.random.default_rng(), alpha = 0.05):
+        if self.sample_cov is not None:
+            total_count = self.sample_cov * (self.end - self.start)
+        else:
+            total_count = self.min_count
+        def stat_func(x):
+            return windowed_gini_null_ratio(x, rng, self.wsize)
+
+        return multiarray_stat(self.arrays, stat_func, 0, total_count, rng,dwnsample = True, include_extras = False)
+
 
 
 
@@ -889,11 +935,11 @@ def multiarray_bed_regions(arrays_plus, arrays_minus, bed_object, pseudocount = 
         if region["strand"] == "-":
             start_padding = downstream
             end_padding = upstream
-            out = RegionMultiWindow(region, arrays_minus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, end_padding = end_padding)
+            out = RegionMultiWindow(region, arrays_minus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, start_padding = start_padding, end_padding = end_padding)
         else:
             start_padding = upstream
             end_padding = downstream
-            out = RegionMultiWindow(region, arrays_plus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, start_padding = start_padding)
+            out = RegionMultiWindow(region, arrays_plus, pseudocount = pseudocount, sample_cov = sample_cov, Zscorecutoff = Zscorecutoff, wsize = wsize, start_padding = start_padding, end_padding = end_padding)
         yield out
 
 
@@ -982,6 +1028,12 @@ def multiprocess_multiPausePerKb_dwnsample_simple(region, rng, bootstraps):
 
 def multiprocess_windowedgini_simple(region, rng, bootstraps):
     return region.WindowedGini(rng = rng, n_boot = bootstraps)
+
+def multiprocess_windowedPausePerKb_simple(region, rng, bootstraps):
+    return region.WindowedPausePerKb(rng = rng, n_boot = bootstraps)
+
+def multiprocess_windowedGiniNullRatio_simple(region, rng, bootstraps):
+    return region.WindowedGiniNullRatio(rng = rng, n_boot = bootstraps)
 
 
 def run_tests_over_strand(arrays, methods, filters, initial_filters, args):
@@ -1300,7 +1352,7 @@ def Ginicompare_main(args):
         header = multiarray_compare_header(args.sample_names, include_null_columns = False)
     elif args.metric == "PausePerKb_simple" or args.metric == "PausePerKb_dwnsample_simple":
         header = multiarray_stat_header(args.sample_names)
-    elif args.metric == "WindowedGini":
+    elif args.metric == "WindowedGini" or args.metric == "WindowedPausePerKb" or args.metric == "WindowedGiniNullRatio":
         header = multiarray_stat_header(args.sample_names, include_extras = False)
     else:
         header = multiarray_compare_header(args.sample_names, include_null_columns = True)
@@ -1313,7 +1365,9 @@ def Ginicompare_main(args):
                         "PausePerKb_dwnsample": multiprocess_multiPausePerKb_dwnsample,
                         "PausePerKb_simple": multiprocess_multiPausePerKb_simple,
                         "PausePerKb_dwnsample_simple": multiprocess_multiPausePerKb_dwnsample_simple,
-                        "WindowedGini": multiprocess_windowedgini_simple}
+                        "WindowedGini": multiprocess_windowedgini_simple,
+                        "WindowedPausePerKb": multiprocess_windowedPausePerKb_simple,
+                        "WindowedGiniNullRatio": multiprocess_windowedGiniNullRatio_simple}
  
     pool = mp.Pool(args.p)
     output = pool.starmap(function_factory[args.metric], 
@@ -1333,7 +1387,7 @@ def Ginicompare_main(args):
                 output_info = "\t".join(["%s"%(value[pos]) for value in array])
                 sys.stdout.write(region_info + "\t" + output_info + "\n")
         else:
-            raise ValueError("Output array dimension doesn't make sense %s"%(array.ndim))
+            raise ValueError("Output array dimension doesn't make sense %s %s"%(len(array[0]), region))
 
     bwtools.close_multiple_bigwigs(plus_strand_handles)
     bwtools.close_multiple_bigwigs(minus_strand_handles)

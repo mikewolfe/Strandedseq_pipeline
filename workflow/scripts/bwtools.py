@@ -684,6 +684,7 @@ def query_main(args):
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
+            'sum' : lambda array: np.nansum(array.astype(int)),
             'RPP' : relative_polymerase_progression,
             'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "ratio", wfunc = w_funcs[args.wfunc]),
             'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.TR_B_center, args.upstream, out = "A",wfunc = w_funcs[args.wfunc]) ,
@@ -695,7 +696,7 @@ def query_main(args):
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
-        KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
+        raise KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
     overall_funcs = {'identity' : lambda bws, names, smtofn, bed, res, gzip: \
             query_summarize_identity(bws, names, smtofn, bed, res, gzip, \
@@ -706,7 +707,7 @@ def query_main(args):
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
-        KeyError("%s is not a valid option for --summarize"%(args.summarize))
+        raise KeyError("%s is not a valid option for --summarize"%(args.summarize))
 
     overall_func(all_bws, samp_names, samp_to_fname, inbed, res, gzip)
     

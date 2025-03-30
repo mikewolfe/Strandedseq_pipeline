@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Umi handling module with UMI-tools for single end reads
+- Windowed Gini calculations in NETseq pause calling
 
 ### Changes
 - Internal locations for temporary bams to avoid name collision
